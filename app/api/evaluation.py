@@ -70,9 +70,9 @@ async def get_api_status():
 async def get_available_models():
     """Get list of available LLM models for evaluation"""
     try:
-        from ..models.llm_judges import LLMJudgesPanel
+        from ..models.contextual_judges import ContextualJudgesPanel
         
-        models = LLMJudgesPanel.get_available_models()
+        models = ContextualJudgesPanel.get_available_models()
         model_list = []
         
         for model_id, config in models.items():
@@ -117,10 +117,10 @@ async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks
         
         # Choose appropriate judges panel based on model_type
         if request.model_type == "llm":
-            # Use LLM judges
-            from ..models.llm_judges import LLMJudgesPanel
+            # Use Contextual judges (advanced contextual analysis)
+            from ..models.contextual_judges import ContextualJudgesPanel
             
-            llm_panel = LLMJudgesPanel(model_name=request.llm_model)
+            llm_panel = ContextualJudgesPanel(model_name=request.llm_model)
             
             # Use custom weights if provided, otherwise use defaults
             weights = request.custom_weights or {
