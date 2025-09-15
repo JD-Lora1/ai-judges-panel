@@ -3,6 +3,8 @@
 // Global variables
 let isEvaluating = false;
 let currentEvaluation = null;
+let availableModels = [];
+let currentModelType = 'hf';
 
 // DOM elements
 const evaluationForm = document.getElementById('evaluation-form');
@@ -23,6 +25,9 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Check system status
     checkSystemStatus();
+    
+    // Load available models
+    loadAvailableModels();
 });
 
 // Initialize evaluation form
@@ -48,7 +53,9 @@ async function handleEvaluationSubmit(event) {
         prompt: formData.get('prompt'),
         response: formData.get('response'),
         domain: formData.get('domain') || null,
-        include_automatic_metrics: formData.get('include_automatic_metrics') === 'on'
+        include_automatic_metrics: formData.get('include_automatic_metrics') === 'on',
+        model_type: formData.get('model_type') || 'hf',
+        llm_model: formData.get('llm_model') || 'google/flan-t5-base'
     };
     
     // Validate input
@@ -78,7 +85,7 @@ async function performEvaluation(data) {
     hideResults();
     
     try {
-        const response = await fetch('/api/v1/evaluate', {
+        const response = await fetch('/api/v1/evaluate/detailed', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -165,8 +172,8 @@ function displayResults(evaluation) {
                 <h5><i class="fas fa-info-circle me-2"></i>Metadatos</h5>
                 <div class="metadata-info">
                     <small class="text-muted">
-                        <strong>Jueces:</strong> ${evaluation.metadata.judges_count}<br>
-                        <strong>Tipo:</strong> ${evaluation.metadata.model_type}<br>
+                        <strong>Tipo:</strong> ${evaluation.metadata.model_type || 'hf'}<br>
+                        ${evaluation.metadata.model_used ? `<strong>Modelo:</strong> ${evaluation.metadata.model_used}<br>` : ''}
                         ${evaluation.metadata.domain ? `<strong>Dominio:</strong> ${evaluation.metadata.domain}<br>` : ''}
                         <strong>Timestamp:</strong> ${new Date(evaluation.timestamp).toLocaleString()}
                     </small>
@@ -376,6 +383,25 @@ function initializeTooltips() {
     const tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
         return new bootstrap.Tooltip(tooltipTriggerEl);
     });
+}
+
+async function loadAvailableModels() {
+    try {
+        const response = await fetch('/api/v1/models/available');
+        const data = await response.json();
+        availableModels = data.available_models;
+        
+        // Update model selector if present
+        const modelSelector = document.getElementById('llm_model');
+        if (modelSelector && availableModels.length > 0) {
+            modelSelector.innerHTML = availableModels.map(model => 
+                `<option value="${model.id}">${model.name}</option>`
+            ).join('');
+        }
+        
+    } catch (error) {
+        console.warn('Could not load available models:', error);
+    }
 }
 
 async function checkSystemStatus() {

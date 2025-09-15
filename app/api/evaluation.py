@@ -28,6 +28,8 @@ class DetailedEvaluationRequest(BaseModel):
     custom_weights: Optional[Dict[str, float]] = Field(None, description="Custom weights for judges")
     include_automatic_metrics: bool = Field(True, description="Include automatic metrics")
     evaluation_id: Optional[str] = Field(None, description="Custom evaluation ID")
+    model_type: str = Field("hf", description="Model type: 'hf' for HuggingFace judges, 'llm' for LLM judges")
+    llm_model: Optional[str] = Field("google/flan-t5-base", description="Specific LLM model for evaluation")
 
 class EvaluationStatus(BaseModel):
     """Status of an ongoing evaluation"""
@@ -43,12 +45,16 @@ class BatchEvaluationRequest(BaseModel):
     """Request for batch evaluation"""
     evaluations: List[DetailedEvaluationRequest]
     batch_name: Optional[str] = Field(None, description="Name for this batch")
+    model_type: str = Field("hf", description="Default model type for batch")
+    llm_model: Optional[str] = Field("google/flan-t5-base", description="Default LLM model for batch")
 
 class ComparisonRequest(BaseModel):
     """Request to compare multiple responses"""
     prompt: str
     responses: Dict[str, str]  # name: response
     domain: Optional[str] = None
+    model_type: str = Field("hf", description="Model type for evaluation")
+    llm_model: Optional[str] = Field("google/flan-t5-base", description="LLM model for evaluation")
 
 @router.get("/status")
 async def get_api_status():
@@ -59,6 +65,37 @@ async def get_api_status():
         "cached_evaluations": len(evaluation_cache),
         "timestamp": datetime.now().isoformat()
     }
+
+@router.get("/models/available")
+async def get_available_models():
+    """Get list of available LLM models for evaluation"""
+    try:
+        from ..models.llm_judges import LLMJudgesPanel
+        
+        models = LLMJudgesPanel.get_available_models()
+        model_list = []
+        
+        for model_id, config in models.items():
+            model_list.append({
+                "id": model_id,
+                "name": config.name,
+                "description": config.description,
+                "max_length": config.max_length,
+                "temperature": config.temperature
+            })
+        
+        return {
+            "available_models": model_list,
+            "default_model": "google/flan-t5-base",
+            "model_types": {
+                "hf": "HuggingFace Judges (embeddings + heuristics)",
+                "llm": "LLM Judges (language model evaluation)"
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get available models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get models: {str(e)}")
 
 @router.post("/evaluate/detailed", response_model=Dict[str, Any])
 async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks: BackgroundTasks):
@@ -78,50 +115,106 @@ async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks
             updated_at=datetime.now()
         )
         
-        # Import the judges panel (assuming it's available globally)
-        from app.main import judges_panel
-        
-        if not judges_panel or not judges_panel.is_ready():
-            raise HTTPException(status_code=503, detail="Judges panel not ready")
-        
-        # Update weights if provided
-        original_weights = judges_panel.weights.copy()
-        if request.custom_weights:
-            judges_panel.weights.update(request.custom_weights)
-        
-        try:
-            # Perform evaluation
-            result = await judges_panel.evaluate(
+        # Choose appropriate judges panel based on model_type
+        if request.model_type == "llm":
+            # Use LLM judges
+            from ..models.llm_judges import LLMJudgesPanel
+            
+            llm_panel = LLMJudgesPanel(model_name=request.llm_model)
+            
+            # Use custom weights if provided, otherwise use defaults
+            weights = request.custom_weights or {
+                "precision": 0.35,
+                "coherence": 0.30,
+                "relevance": 0.20,
+                "efficiency": 0.10,
+                "creativity": 0.05
+            }
+            
+            # Perform LLM-based evaluation
+            llm_result = await llm_panel.evaluate_response_async(
                 prompt=request.prompt,
                 response=request.response,
-                domain=request.domain,
-                include_automatic_metrics=request.include_automatic_metrics
+                weights=weights
             )
             
-            # Convert to dict for JSON response
+            # Convert LLM result to standard format
             result_dict = {
                 "evaluation_id": eval_id,
-                "final_score": result.final_score,
-                "individual_scores": result.individual_scores,
-                "consensus_level": result.consensus_level,
-                "strengths": result.strengths,
-                "improvements": result.improvements,
-                "evaluation_time": result.evaluation_time,
-                "metadata": result.metadata,
+                "final_score": llm_result["overall_score"],
+                "individual_scores": {
+                    "precision": llm_result["individual_scores"]["precision"]["score"],
+                    "coherence": llm_result["individual_scores"]["coherence"]["score"],
+                    "relevance": llm_result["individual_scores"]["relevance"]["score"],
+                    "efficiency": llm_result["individual_scores"]["efficiency"]["score"],
+                    "creativity": llm_result["individual_scores"]["creativity"]["score"]
+                },
+                "consensus_level": llm_result["consensus"],
+                "strengths": [
+                    llm_result["individual_scores"]["precision"]["feedback"],
+                    llm_result["individual_scores"]["coherence"]["feedback"],
+                    llm_result["individual_scores"]["relevance"]["feedback"]
+                ],
+                "improvements": [
+                    llm_result["individual_scores"]["efficiency"]["feedback"],
+                    llm_result["individual_scores"]["creativity"]["feedback"]
+                ],
+                "evaluation_time": 0.0,  # Will be calculated
+                "metadata": {
+                    "model_used": llm_result["model_used"],
+                    "model_type": "llm",
+                    "weights": llm_result["weights"],
+                    "evaluation_stats": llm_result["evaluation_stats"]
+                },
                 "timestamp": datetime.now().isoformat()
             }
             
-            # Update cache
-            evaluation_cache[eval_id].status = "completed"
-            evaluation_cache[eval_id].progress = 1.0
-            evaluation_cache[eval_id].result = result_dict
-            evaluation_cache[eval_id].updated_at = datetime.now()
+        else:
+            # Use original HuggingFace judges
+            from app.main import judges_panel
             
-            return result_dict
+            if not judges_panel or not judges_panel.is_ready():
+                raise HTTPException(status_code=503, detail="Judges panel not ready")
             
-        finally:
-            # Restore original weights
-            judges_panel.weights = original_weights
+            # Update weights if provided
+            original_weights = judges_panel.weights.copy()
+            if request.custom_weights:
+                judges_panel.weights.update(request.custom_weights)
+            
+            try:
+                # Perform evaluation
+                result = await judges_panel.evaluate(
+                    prompt=request.prompt,
+                    response=request.response,
+                    domain=request.domain,
+                    include_automatic_metrics=request.include_automatic_metrics
+                )
+            
+                # Convert to dict for JSON response
+                result_dict = {
+                    "evaluation_id": eval_id,
+                    "final_score": result.final_score,
+                    "individual_scores": result.individual_scores,
+                    "consensus_level": result.consensus_level,
+                    "strengths": result.strengths,
+                    "improvements": result.improvements,
+                    "evaluation_time": result.evaluation_time,
+                    "metadata": {**result.metadata, "model_type": "hf"},
+                    "timestamp": datetime.now().isoformat()
+                }
+            
+            finally:
+                # Restore original weights for HF judges
+                if request.model_type == "hf":
+                    judges_panel.weights = original_weights
+            
+        # Update cache
+        evaluation_cache[eval_id].status = "completed"
+        evaluation_cache[eval_id].progress = 1.0
+        evaluation_cache[eval_id].result = result_dict
+        evaluation_cache[eval_id].updated_at = datetime.now()
+        
+        return result_dict
             
     except Exception as e:
         logger.error(f"Detailed evaluation failed: {e}")

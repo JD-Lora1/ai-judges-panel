@@ -105,6 +105,39 @@
                         </div>
                     </div>
 
+                    <!-- Model Selection -->
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="model_type" class="form-label">
+                                <i class="fas fa-brain me-2"></i>
+                                <strong>Tipo de Evaluación</strong>
+                            </label>
+                            <select class="form-select" id="model_type" name="model_type" onchange="toggleModelSelector()">
+                                <option value="hf">HuggingFace Judges (rápido)</option>
+                                <option value="llm">LLM Judges (contextual)</option>
+                            </select>
+                            <div class="form-text">
+                                LLM Judges evalúan mejor la relación prompt-respuesta pero son más lentos.
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6" id="llm_model_container" style="display: none;">
+                            <label for="llm_model" class="form-label">
+                                <i class="fas fa-microchip me-2"></i>
+                                <strong>Modelo LLM</strong>
+                            </label>
+                            <select class="form-select" id="llm_model" name="llm_model">
+                                <option value="google/flan-t5-base">FLAN-T5 Base (recomendado)</option>
+                                <option value="microsoft/DialoGPT-medium">DialoGPT Medium</option>
+                                <option value="distilgpt2">DistilGPT2 (rápido)</option>
+                                <option value="microsoft/DialoGPT-small">DialoGPT Small</option>
+                            </select>
+                            <div class="form-text">
+                                Modelos más grandes dan mejores resultados pero son más lentos.
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Examples -->
                     <div class="mb-4">
                         <button type="button" class="btn btn-outline-info btn-sm" onclick="loadExample()">
@@ -322,6 +355,18 @@ function clearForm() {
         textarea.style.height = 'auto';
     });
     hideResults();
+}
+
+// Toggle model selector visibility
+function toggleModelSelector() {
+    const modelType = document.getElementById('model_type').value;
+    const llmContainer = document.getElementById('llm_model_container');
+    
+    if (modelType === 'llm') {
+        llmContainer.style.display = 'block';
+    } else {
+        llmContainer.style.display = 'none';
+    }
 }
 
 // Auto-resize textareas on input
