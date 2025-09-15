@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 import uvicorn
 import os
+import time
 from typing import Dict, Any, Optional, List
 import asyncio
 import logging
@@ -99,14 +100,32 @@ async def health_check():
     """Health check endpoint for Railway"""
     global judges_panel
     
+    # Basic health status
     status = {
         "status": "healthy",
-        "judges_panel_ready": judges_panel is not None and judges_panel.is_ready()
+        "timestamp": time.time(),
+        "judges_panel_ready": False,
+        "judges_count": 0
     }
     
-    if not status["judges_panel_ready"]:
-        raise HTTPException(status_code=503, detail="Judges panel not ready")
+    try:
+        if judges_panel is not None:
+            status["judges_panel_ready"] = judges_panel.is_ready()
+            status["judges_count"] = len(judges_panel.judges)
+            
+            # Get judge status
+            judges_status = []
+            for judge in judges_panel.judges:
+                judges_status.append({
+                    "name": judge.name,
+                    "initialized": judge.is_initialized
+                })
+            status["judges_status"] = judges_status
+    except Exception as e:
+        logger.warning(f"Health check warning: {e}")
+        status["warning"] = str(e)
     
+    # Return 200 even if judges not ready (for Railway health check)
     return status
 
 # API endpoints

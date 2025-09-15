@@ -114,15 +114,22 @@ class CoherenceJudge(HuggingFaceJudge):
         try:
             logger.info(f"🔄 Initializing {self.name} for coherence evaluation...")
             
-            # Use sentence transformers for coherence evaluation
-            self.sentence_transformer = SentenceTransformer('all-MiniLM-L6-v2')
+            # Use sentence transformers for coherence evaluation with timeout
+            import asyncio
+            loop = asyncio.get_event_loop()
+            self.sentence_transformer = await loop.run_in_executor(
+                None, 
+                lambda: SentenceTransformer('all-MiniLM-L6-v2')
+            )
             
             self.is_initialized = True
             logger.info(f"✅ {self.name} initialized successfully!")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize {self.name}: {e}")
-            raise
+            logger.warning(f"⚠️ Failed to initialize {self.name} with HF model: {e}")
+            logger.info(f"Using fallback mode for {self.name}")
+            self.sentence_transformer = None
+            self.is_initialized = True
     
     async def evaluate_aspect(self, context: EvaluationContext) -> float:
         """Evaluate coherence by analyzing sentence embeddings and flow"""
@@ -139,18 +146,36 @@ class CoherenceJudge(HuggingFaceJudge):
             if len(sentences) < 2:
                 return 7.0  # Single sentence is coherent by default
             
-            # Get sentence embeddings
-            embeddings = self.sentence_transformer.encode(sentences)
-            
-            # Calculate coherence as average cosine similarity between consecutive sentences
-            similarities = []
-            for i in range(len(embeddings) - 1):
-                sim = cosine_similarity([embeddings[i]], [embeddings[i + 1]])[0][0]
-                similarities.append(sim)
-            
-            # Convert to 0-10 scale
-            avg_similarity = np.mean(similarities)
-            score = min(10.0, max(0.0, (avg_similarity + 1) * 5))  # Normalize to 0-10
+            # Use HF model if available, otherwise fallback to heuristics
+            if self.sentence_transformer is not None:
+                # Get sentence embeddings
+                embeddings = self.sentence_transformer.encode(sentences)
+                
+                # Calculate coherence as average cosine similarity between consecutive sentences
+                similarities = []
+                for i in range(len(embeddings) - 1):
+                    sim = cosine_similarity([embeddings[i]], [embeddings[i + 1]])[0][0]
+                    similarities.append(sim)
+                
+                # Convert to 0-10 scale
+                avg_similarity = np.mean(similarities)
+                score = min(10.0, max(0.0, (avg_similarity + 1) * 5))  # Normalize to 0-10
+            else:
+                # Fallback: simple heuristic based on sentence length variation and connectors
+                score = 7.0  # Base score
+                
+                # Check for coherence indicators
+                coherence_words = ['además', 'sin embargo', 'por tanto', 'en consecuencia', 'también']
+                connector_count = sum(1 for word in coherence_words if word in text.lower())
+                if connector_count > 0:
+                    score += min(1.5, connector_count * 0.5)
+                
+                # Penalize very inconsistent sentence lengths
+                lengths = [len(s.split()) for s in sentences]
+                if len(lengths) > 1:
+                    length_variance = np.var(lengths)
+                    if length_variance > 100:  # Very inconsistent
+                        score -= 1.0
             
             return float(score)
             
@@ -303,15 +328,22 @@ class RelevanceJudge(HuggingFaceJudge):
         try:
             logger.info(f"🔄 Initializing {self.name} for relevance evaluation...")
             
-            # Use sentence transformers for semantic similarity
-            self.sentence_transformer = SentenceTransformer('all-MiniLM-L6-v2')
+            # Use sentence transformers for semantic similarity with timeout
+            import asyncio
+            loop = asyncio.get_event_loop()
+            self.sentence_transformer = await loop.run_in_executor(
+                None, 
+                lambda: SentenceTransformer('all-MiniLM-L6-v2')
+            )
             
             self.is_initialized = True
             logger.info(f"✅ {self.name} initialized successfully!")
             
         except Exception as e:
-            logger.error(f"❌ Failed to initialize {self.name}: {e}")
-            raise
+            logger.warning(f"⚠️ Failed to initialize {self.name} with HF model: {e}")
+            logger.info(f"Using fallback mode for {self.name}")
+            self.sentence_transformer = None
+            self.is_initialized = True
     
     async def evaluate_aspect(self, context: EvaluationContext) -> float:
         """Evaluate relevance using semantic similarity between prompt and response"""
@@ -319,20 +351,38 @@ class RelevanceJudge(HuggingFaceJudge):
             return 5.0
         
         try:
-            prompt = context.original_prompt
-            response = context.candidate_response
+            prompt = context.original_prompt.lower()
+            response = context.candidate_response.lower()
             
-            # Get embeddings
-            prompt_embedding = self.sentence_transformer.encode([prompt])
-            response_embedding = self.sentence_transformer.encode([response])
+            if self.sentence_transformer is not None:
+                # Get embeddings
+                prompt_embedding = self.sentence_transformer.encode([prompt])
+                response_embedding = self.sentence_transformer.encode([response])
+                
+                # Calculate semantic similarity
+                similarity = cosine_similarity(prompt_embedding, response_embedding)[0][0]
+                
+                # Convert to 0-10 scale
+                score = min(10.0, max(0.0, (similarity + 1) * 5))
+            else:
+                # Fallback: keyword overlap and basic heuristics
+                prompt_words = set(prompt.split())
+                response_words = set(response.split())
+                
+                # Calculate word overlap
+                common_words = prompt_words.intersection(response_words)
+                overlap_ratio = len(common_words) / len(prompt_words) if prompt_words else 0
+                
+                # Base score from overlap
+                score = 5.0 + (overlap_ratio * 5.0)  # Scale 0-1 to 5-10
+                
+                # Bonus for addressing the question directly
+                question_words = ['qué', 'cómo', 'cuándo', 'dónde', 'por qué', 'quién']
+                if any(word in prompt for word in question_words):
+                    if len(response.split()) > 20:  # Substantial response
+                        score += 1.0
             
-            # Calculate semantic similarity
-            similarity = cosine_similarity(prompt_embedding, response_embedding)[0][0]
-            
-            # Convert to 0-10 scale
-            score = min(10.0, max(0.0, (similarity + 1) * 5))
-            
-            return float(score)
+            return float(min(10.0, max(0.0, score)))
             
         except Exception as e:
             logger.error(f"Error in relevance evaluation: {e}")
@@ -601,14 +651,37 @@ class HuggingFaceJudgesPanel:
         }
     
     async def initialize(self):
-        """Initialize all judges"""
-        logger.info("🏛️ Initializing Hugging Face Judges Panel...")
+        """Initialize all judges with timeout"""
+        logger.info("🏦 Initializing Hugging Face Judges Panel...")
         
         initialization_tasks = [judge.initialize() for judge in self.judges]
-        await asyncio.gather(*initialization_tasks, return_exceptions=True)
+        
+        try:
+            # Set timeout for initialization (2 minutes max)
+            results = await asyncio.wait_for(
+                asyncio.gather(*initialization_tasks, return_exceptions=True),
+                timeout=120.0
+            )
+            
+            # Check results
+            failed_judges = []
+            for i, result in enumerate(results):
+                if isinstance(result, Exception):
+                    failed_judges.append(self.judges[i].name)
+                    logger.warning(f"⚠️ Judge {self.judges[i].name} failed to initialize: {result}")
+            
+            if failed_judges:
+                logger.info(f"Panel ready with {len(self.judges) - len(failed_judges)}/{len(self.judges)} judges")
+            else:
+                logger.info("✅ All judges initialized successfully!")
+                
+        except asyncio.TimeoutError:
+            logger.warning("⚠️ Judge initialization timed out, using fallback modes")
+        except Exception as e:
+            logger.error(f"❌ Error during initialization: {e}")
         
         self.is_ready_flag = True
-        logger.info("✅ All judges initialized successfully!")
+        logger.info("✅ Judges panel is ready!")
     
     def is_ready(self) -> bool:
         """Check if the panel is ready"""

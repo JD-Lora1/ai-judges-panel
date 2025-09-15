@@ -17,11 +17,11 @@ seaborn>=0.11.0
 jupyter>=1.0.0
 ipywidgets>=7.6.0
 
-# NLP and Hugging Face
-torch>=2.0.0
+# NLP and Hugging Face (simplified for faster deployment)
+# torch>=2.0.0  # Optional: only if needed
 transformers>=4.35.0
 sentence-transformers>=2.2.0
-tokenizers>=0.15.0
+# tokenizers>=0.15.0  # Included with transformers
 nltk>=3.7
 rouge-score>=0.1.2
 textstat>=0.7.3
