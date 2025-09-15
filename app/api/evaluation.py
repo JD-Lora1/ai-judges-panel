@@ -29,7 +29,7 @@ class DetailedEvaluationRequest(BaseModel):
     include_automatic_metrics: bool = Field(True, description="Include automatic metrics")
     evaluation_id: Optional[str] = Field(None, description="Custom evaluation ID")
     model_type: str = Field("hf", description="Model type: 'hf' for HuggingFace judges, 'llm' for LLM judges")
-    llm_model: Optional[str] = Field("google/flan-t5-base", description="Specific LLM model for evaluation")
+    llm_model: Optional[str] = Field("distilgpt2", description="Specific LLM model for evaluation")
 
 class EvaluationStatus(BaseModel):
     """Status of an ongoing evaluation"""
@@ -46,7 +46,7 @@ class BatchEvaluationRequest(BaseModel):
     evaluations: List[DetailedEvaluationRequest]
     batch_name: Optional[str] = Field(None, description="Name for this batch")
     model_type: str = Field("hf", description="Default model type for batch")
-    llm_model: Optional[str] = Field("google/flan-t5-base", description="Default LLM model for batch")
+    llm_model: Optional[str] = Field("distilgpt2", description="Default LLM model for batch")
 
 class ComparisonRequest(BaseModel):
     """Request to compare multiple responses"""
@@ -54,7 +54,7 @@ class ComparisonRequest(BaseModel):
     responses: Dict[str, str]  # name: response
     domain: Optional[str] = None
     model_type: str = Field("hf", description="Model type for evaluation")
-    llm_model: Optional[str] = Field("google/flan-t5-base", description="LLM model for evaluation")
+    llm_model: Optional[str] = Field("distilgpt2", description="LLM model for evaluation")
 
 @router.get("/status")
 async def get_api_status():
@@ -86,7 +86,7 @@ async def get_available_models():
         
         return {
             "available_models": model_list,
-            "default_model": "google/flan-t5-base",
+            "default_model": "distilgpt2",
             "model_types": {
                 "hf": "HuggingFace Judges (embeddings + heuristics)",
                 "llm": "LLM Judges (language model evaluation)"

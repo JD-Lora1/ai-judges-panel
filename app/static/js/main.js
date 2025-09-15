@@ -55,7 +55,7 @@ async function handleEvaluationSubmit(event) {
         domain: formData.get('domain') || null,
         include_automatic_metrics: formData.get('include_automatic_metrics') === 'on',
         model_type: formData.get('model_type') || 'hf',
-        llm_model: formData.get('llm_model') || 'google/flan-t5-base'
+        llm_model: formData.get('llm_model') || 'distilgpt2'
     };
     
     // Validate input

@@ -127,13 +127,13 @@
                                 <strong>Modelo LLM</strong>
                             </label>
                             <select class="form-select" id="llm_model" name="llm_model">
-                                <option value="google/flan-t5-base">FLAN-T5 Base (recomendado)</option>
-                                <option value="microsoft/DialoGPT-medium">DialoGPT Medium</option>
-                                <option value="distilgpt2">DistilGPT2 (rápido)</option>
-                                <option value="microsoft/DialoGPT-small">DialoGPT Small</option>
+                                <option value="distilgpt2">DistilGPT2 (RECOMENDADO - ~5s)</option>
+                                <option value="microsoft/DialoGPT-small">DialoGPT Small (~8s)</option>
+                                <option value="google/flan-t5-base">FLAN-T5 Base (~12s)</option>
+                                <option value="microsoft/DialoGPT-medium">DialoGPT Medium (~20s)</option>
                             </select>
                             <div class="form-text">
-                                Modelos más grandes dan mejores resultados pero son más lentos.
+                                DistilGPT2 es rápido y eficiente para evaluación contextual. Tiempos estimados tras la primera carga.
                             </div>
                         </div>
                     </div>

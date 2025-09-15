@@ -6,6 +6,7 @@ import logging
 from dataclasses import dataclass
 import asyncio
 import json
+import time
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -21,38 +22,41 @@ class ModelConfig:
 class LLMJudgesPanel:
     """Panel de jueces que utiliza modelos de lenguaje reales para evaluación contextual."""
     
+    # Singleton pattern - cache global de modelos
+    _model_cache = {}
+    
     AVAILABLE_MODELS = {
         "microsoft/DialoGPT-medium": ModelConfig(
             name="DialoGPT Medium",
             model_id="microsoft/DialoGPT-medium",
-            max_length=512,
-            temperature=0.3,
+            max_length=80,
+            temperature=0.2,
             description="Modelo conversacional de Microsoft, bueno para evaluar coherencia contextual"
         ),
         "google/flan-t5-base": ModelConfig(
             name="FLAN-T5 Base",
             model_id="google/flan-t5-base",
-            max_length=512,
-            temperature=0.5,
+            max_length=60,
+            temperature=0.3,
             description="Modelo instruction-following de Google, excelente para evaluación de relevancia"
         ),
-        "distilbert/distilgpt2": ModelConfig(
+        "distilgpt2": ModelConfig(
             name="DistilGPT2",
             model_id="distilgpt2",
-            max_length=512,
-            temperature=0.4,
-            description="Modelo ligero de generación de texto, rápido y eficiente"
+            max_length=50,
+            temperature=0.2,
+            description="Modelo ligero de generación de texto, rápido y eficiente (RECOMENDADO)"
         ),
         "microsoft/DialoGPT-small": ModelConfig(
             name="DialoGPT Small",
             model_id="microsoft/DialoGPT-small",
-            max_length=256,
-            temperature=0.3,
+            max_length=50,
+            temperature=0.2,
             description="Versión más ligera de DialoGPT, ideal para evaluaciones rápidas"
         )
     }
     
-    def __init__(self, model_name: str = "google/flan-t5-base"):
+    def __init__(self, model_name: str = "distilgpt2"):
         self.model_name = model_name
         self.model_config = self.AVAILABLE_MODELS.get(model_name)
         if not self.model_config:
@@ -62,9 +66,16 @@ class LLMJudgesPanel:
         self._load_model()
         
     def _load_model(self):
-        """Carga el modelo seleccionado."""
+        """Carga el modelo seleccionado usando singleton pattern para cache."""
+        # Verificar si el modelo ya está en cache
+        if self.model_name in self._model_cache:
+            logger.info(f"✅ Usando modelo {self.model_config.name} desde cache")
+            self.pipeline = self._model_cache[self.model_name]
+            return
+            
         try:
-            logger.info(f"Cargando modelo {self.model_config.name}...")
+            logger.info(f"🔄 Cargando modelo {self.model_config.name} por primera vez...")
+            start_time = time.time()
             
             if "flan-t5" in self.model_name:
                 self.pipeline = pipeline(
@@ -72,7 +83,8 @@ class LLMJudgesPanel:
                     model=self.model_config.model_id,
                     max_length=self.model_config.max_length,
                     temperature=self.model_config.temperature,
-                    do_sample=True
+                    do_sample=False,  # Más rápido y determinístico
+                    device=-1  # Force CPU to avoid GPU conflicts
                 )
             else:
                 self.pipeline = pipeline(
@@ -80,25 +92,37 @@ class LLMJudgesPanel:
                     model=self.model_config.model_id,
                     max_length=self.model_config.max_length,
                     temperature=self.model_config.temperature,
-                    do_sample=True,
-                    pad_token_id=50256
+                    do_sample=False,  # Más rápido y determinístico
+                    pad_token_id=50256,
+                    device=-1  # Force CPU to avoid GPU conflicts
                 )
             
-            logger.info(f"Modelo {self.model_config.name} cargado exitosamente")
+            # Guardar en cache
+            self._model_cache[self.model_name] = self.pipeline
+            load_time = time.time() - start_time
+            
+            logger.info(f"✅ Modelo {self.model_config.name} cargado en {load_time:.1f}s y guardado en cache")
+            
         except Exception as e:
-            logger.error(f"Error cargando modelo {self.model_name}: {str(e)}")
+            logger.error(f"❌ Error cargando modelo {self.model_name}: {str(e)}")
             # Fallback a modelo más simple
-            self.model_name = "distilgpt2"
-            self.model_config = self.AVAILABLE_MODELS[self.model_name]
-            self.pipeline = pipeline(
-                "text-generation",
-                model=self.model_config.model_id,
-                max_length=256,
-                temperature=0.4,
-                do_sample=True,
-                pad_token_id=50256
-            )
-            logger.info("Fallback a DistilGPT2 completado")
+            fallback_model = "distilgpt2"
+            if fallback_model not in self._model_cache:
+                logger.info("🔄 Cargando modelo fallback DistilGPT2...")
+                self._model_cache[fallback_model] = pipeline(
+                    "text-generation",
+                    model=fallback_model,
+                    max_length=50,
+                    temperature=0.2,
+                    do_sample=False,
+                    pad_token_id=50256,
+                    device=-1
+                )
+            
+            self.model_name = fallback_model
+            self.model_config = self.AVAILABLE_MODELS[fallback_model]
+            self.pipeline = self._model_cache[fallback_model]
+            logger.info("✅ Fallback a DistilGPT2 completado")
     
     def _generate_evaluation_prompt(self, judge_name: str, prompt: str, response: str, criteria: str) -> str:
         """Genera el prompt para que el LLM evalúe como un juez específico."""
@@ -160,9 +184,23 @@ Formato: "Puntuación: X/10. Justificación: [razón breve]"""
         
         try:
             if "flan-t5" in self.model_name:
-                llm_response = self.pipeline(eval_prompt, max_length=100, num_return_sequences=1)[0]['generated_text']
+                llm_response = self.pipeline(
+                    eval_prompt, 
+                    max_length=self.model_config.max_length,
+                    num_return_sequences=1,
+                    do_sample=False,
+                    early_stopping=True
+                )[0]['generated_text']
             else:
-                llm_response = self.pipeline(eval_prompt, max_length=len(eval_prompt) + 100, num_return_sequences=1)[0]['generated_text']
+                results = self.pipeline(
+                    eval_prompt, 
+                    max_length=len(eval_prompt) + self.model_config.max_length,
+                    num_return_sequences=1,
+                    do_sample=False,
+                    early_stopping=True,
+                    pad_token_id=50256
+                )
+                llm_response = results[0]['generated_text']
                 # Remover el prompt original de la respuesta
                 llm_response = llm_response[len(eval_prompt):].strip()
             
