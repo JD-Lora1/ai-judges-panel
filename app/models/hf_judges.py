@@ -641,13 +641,13 @@ class HuggingFaceJudgesPanel:
             CreativityJudge()
         ]
         
-        # Default weights
+        # Default weights (updated for better evaluation balance)
         self.weights = {
-            "precision": 0.25,
-            "coherence": 0.25,
-            "relevance": 0.20,
-            "efficiency": 0.15,
-            "creativity": 0.15
+            "precision": 0.35,     # Increased - factual accuracy is critical
+            "coherence": 0.30,     # Increased - logical structure is essential
+            "relevance": 0.20,     # Maintained - answering the question correctly
+            "efficiency": 0.10,    # Reduced - less critical than accuracy
+            "creativity": 0.05     # Reduced - least critical for most use cases
         }
     
     async def initialize(self):

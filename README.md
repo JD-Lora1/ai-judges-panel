@@ -77,38 +77,45 @@ Este proyecto implementa una **arquitectura de panel de jueces** donde múltiple
 - Genera un reporte explicativo detallado
 - Identifica consensos y discrepancias entre jueces
 
-### **Métricas Híbridas**
+### **Métricas Híbridas Ponderadas**
 ```python
 final_score = (
-    0.25 * precision_score +
-    0.20 * creativity_score +
-    0.25 * coherence_score +
-    0.20 * relevance_score +
-    0.10 * efficiency_score
-) * automatic_metrics_boost
+    0.35 * precision_score +    # Mayor peso: exactitud factual
+    0.30 * coherence_score +    # Mayor peso: estructura lógica  
+    0.20 * relevance_score +    # Peso medio: pertinencia al prompt
+    0.10 * efficiency_score +   # Peso menor: claridad y concisión
+    0.05 * creativity_score     # Peso mínimo: originalidad
+) + automatic_metrics_boost
 ```
+
+> **Nota**: El sistema evalúa la **relación prompt-respuesta**, no solo la respuesta aisladamente. Cada juez considera tanto la pregunta original como la calidad de la respuesta en ese contexto específico.
 
 ## 🚀 Casos de Uso
 
 ### 1. **Evaluación de Chatbots** 🤖
-- Compara respuestas de diferentes modelos (GPT, Claude, Gemini)
-- Identifica fortalezas específicas de cada modelo
-- Optimiza prompts basado en feedback multi-dimensional
+- **Prompt-Aware**: Compara cómo GPT, Claude, Gemini responden al **mismo prompt**
+- **Contextual**: Identifica qué modelo entiende mejor la **intención** del prompt
+- **Optimización**: Mejora prompts basado en feedback específico de cada relación prompt-respuesta
 
 ### 2. **Content Generation Assessment** ✍️
-- Evalúa artículos, ensayos, código generado
-- Feedback granular para mejora iterativa
-- Benchmarking de modelos creativos
+- **Pertinencia**: ¿El contenido generado cumple **exactamente** con el briefing/prompt?
+- **Coherencia Contextual**: ¿La estructura responde a lo solicitado en el prompt?
+- **Precisión**: ¿Los hechos/datos generados son consistentes con los requerimientos?
 
 ### 3. **Educational AI Evaluation** 🎓
-- Evalúa respuestas de AI tutores
-- Mide calidad pedagógica desde múltiples ángulos
-- Detecta sesgos en explicaciones
+- **Relevancia Pedagógica**: ¿La explicación del AI aborda la pregunta del estudiante?
+- **Coherencia Didáctica**: ¿La respuesta sigue un flujo lógico apropiado para el nivel?
+- **Precisión Educativa**: ¿La información es factualmente correcta y verificable?
 
 ### 4. **Research Assistant Analysis** 🔬
-- Evalúa calidad de síntesis de literatura
-- Verifica accuracy de citaciones y hechos
-- Mide creatividad en conexión de conceptos
+- **Relevancia de Síntesis**: ¿La síntesis responde a la consulta de investigación?
+- **Precisión Académica**: Verifica accuracy de citaciones **en relación al tema** consultado
+- **Coherencia Conceptual**: ¿Las conexiones propuestas son lógicas dado el contexto?
+
+### 5. **Evaluación de Prompts Complejos** 🧠
+- **Multi-step Instructions**: Evalúa cómo los LLMs manejan prompts con múltiples pasos
+- **Domain-Specific Queries**: Mide precisión en respuestas técnicas, legales, médicas
+- **Creative vs Factual Balance**: Detecta cuándo priorizar creatividad vs exactitud según el prompt
 
 ## 🛠️ Estructura del Proyecto
 
@@ -201,16 +208,21 @@ async def main():
     panel = HuggingFaceJudgesPanel()
     await panel.initialize()
     
-    # Evaluar una respuesta
+    # Evaluar relación prompt-respuesta (no solo la respuesta)
     result = await panel.evaluate(
-        prompt="Explica la inteligencia artificial",
-        response="La IA es un campo de la informática..."
+        prompt="Explica qué es la inteligencia artificial y da 3 ejemplos prácticos",
+        response="La IA es un campo de la informática que simula inteligencia humana. Ejemplos: 1) Asistentes virtuales como Siri, 2) Recomendaciones de Netflix, 3) Coches autónomos de Tesla.",
+        domain="technical"
     )
     
     print(f"Score Final: {result.final_score:.1f}/10")
     print(f"Consenso: {result.consensus_level:.1%}")
+    print("\nEvaluación por aspecto:")
     for aspect, score in result.individual_scores.items():
-        print(f"{aspect.title()}: {score:.1f}/10")
+        print(f"  {aspect.title()}: {score:.1f}/10")
+    print("\nFortalezas principales:")
+    for strength in result.strengths[:3]:
+        print(f"  ✓ {strength}")
 
 # Ejecutar
 asyncio.run(main())
@@ -274,3 +286,99 @@ Desde la aplicación desplegada: **https://ai-judges-ai.up.railway.app/**
 - `GET /health` - Health check para Railway
 
 **Próximo paso**: Despliega en Railway o ejecuta `uvicorn app.main:app --reload`
+
+## 🤖 **Cómo Funciona: Arquitectura Técnica**
+
+### **🎨 Flujo de Evaluación Multi-Agente**
+
+1. **Input**: Usuario ingresa `prompt` + `respuesta_del_LLM`
+2. **Contexto**: Sistema crea `EvaluationContext` con ambos elementos
+3. **Evaluación Paralela**: Los 5 jueces analizan simultáneamente en ~10-30 segundos
+4. **Meta-Agregación**: Combina scores con pesos personalizados + análisis de consenso
+5. **Output**: Score final + feedback detallado + visualización
+
+### **🤖 Modelos de Hugging Face Utilizados**
+
+#### **🎯 Dr. Precisión** (Peso: 35%)
+- **Técnica**: Análisis heurístico inteligente + NLP
+- **Evalúa**: Exactitud factual, ausencia de alucinaciones, referencias válidas
+- **Algoritmos**:
+  - Detecta indicadores de incertidumbre (`"quizás", "tal vez", "posiblemente"`)
+  - Penaliza declaraciones absolutas (`"siempre", "nunca", "todos"`)
+  - Busca números específicos, fechas, y citaciones científicas
+  - Analiza la relación entre afirmaciones del prompt y respuesta
+
+#### **🧠 Prof. Coherencia** (Peso: 30%)
+- **Modelo HF**: `all-MiniLM-L6-v2` (SentenceTransformers)
+- **Técnica**: Embeddings semánticos + similitud coseno
+- **Evalúa**: Flujo lógico, transiciones, consistencia interna
+- **Proceso**:
+  1. Genera **embeddings semánticos** de cada oración
+  2. Calcula **similitud coseno** entre oraciones consecutivas
+  3. **Fallback**: Análisis de conectores lingüísticos si HF falla
+  4. Considera cómo la respuesta mantiene coherencia con el prompt
+
+#### **🎪 Lic. Relevancia** (Peso: 20%)
+- **Modelo HF**: `all-MiniLM-L6-v2` (SentenceTransformers)
+- **Técnica**: Similitud semántica prompt ↔ respuesta
+- **Evalúa**: Pertinencia directa, completitud, foco temático
+- **Proceso**:
+  1. **Embeddings** separados de prompt y respuesta
+  2. **Similitud semántica** entre ambos vectores
+  3. **Fallback**: Análisis de overlap de palabras clave
+  4. **Contexto**: Si el prompt hace una pregunta específica, ¿la respuesta la aborda?
+
+#### **⚡ Ed. Eficiencia** (Peso: 10%)
+- **Herramienta**: `textstat` library + métricas personalizadas
+- **Técnica**: Índices de legibilidad + análisis de concisión
+- **Evalúa**: Claridad, longitud apropiada, facilidad de lectura
+- **Algoritmos**:
+  - **Índice Flesch** de legibilidad (>60 = fácil de leer)
+  - Análisis de longitud vs. complejidad del prompt
+  - Detección si el prompt requiere respuesta detallada
+  - Métricas de palabras por oración
+
+#### **🎨 Dra. Creatividad** (Peso: 5%)
+- **Técnica**: Análisis léxico-estadístico + heurísticas
+- **Evalúa**: Originalidad, diversidad léxica, perspectivas únicas
+- **Algoritmos**:
+  - **Diversidad léxica**: unique_words / total_words
+  - Detección de **indicadores creativos** (`"imaginemos", "supongamos", "metáfora"`)
+  - Análisis de **variedad en estructura** de oraciones
+  - Considera si el prompt solicita creatividad específicamente
+
+### **🔄 Robustez y Modos Fallback**
+
+El sistema tiene **tolerancia a fallos** incorporada:
+
+- **🔄 Inicialización**: Timeout de 2 minutos, continua con fallbacks si HF falla
+- **⚙️ Fallback Inteligente**: Si `SentenceTransformers` no carga → heurísticas de NLP
+- **🛡️ Manejo de Errores**: Juez individual falla → score neutro (5.0)
+- **📊 Consenso**: Analiza discrepancias entre jueces para detectar casos ambiguos
+
+### **📊 Análisis de Consenso**
+
+```python
+# Mide qué tan de acuerdo están los 5 jueces
+consensus_level = 1.0 - (std_dev_scores / 5.0)
+
+# Interpretación:
+# > 0.8 = Alto consenso (jueces de acuerdo)
+# 0.6-0.8 = Consenso moderado (algunas diferencias)
+# < 0.6 = Bajo consenso (evaluación compleja/ambigua)
+```
+
+### **🎯 Evaluación Contextual Prompt-Respuesta**
+
+**Característica Clave**: El sistema NO evalúa respuestas en el vacío.
+
+✅ **Lo que hace el sistema**:
+- Analiza cómo la respuesta **responde específicamente** al prompt
+- Considera si el prompt requiere **creatividad, precisión, o detalle**
+- Evalúa la **relevancia semántica** entre pregunta y respuesta
+- Ajusta expectativas según el **dominio** (técnico, creativo, académico)
+
+❌ **Lo que NO hace**:
+- Evaluar respuestas sin contexto del prompt original
+- Aplicar criterios uniformes independientes de la pregunta
+- Ignorar la intención y complejidad del prompt
