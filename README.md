@@ -1,6 +1,8 @@
 # AI Judges Panel 🏛️⚖️
 ## Una Arquitectura Multi-Agente para Evaluación de LLMs
 
+🚀 **[Aplicación Web en Vivo - https://ai-judges-ai.up.railway.app/](https://ai-judges-ai.up.railway.app/)**
+
 ### 🎯 Visión del Proyecto
 
 Este proyecto implementa una **arquitectura de panel de jueces** donde múltiples LLMs especializados evalúan las respuestas de otros LLMs desde diferentes perspectivas, combinando la robustez de métricas automáticas con el juicio inteligente de modelos de lenguaje.
@@ -261,12 +263,14 @@ PYTHONPATH=.
 
 ### Endpoints Disponibles
 
-- `GET /` - Interfaz web principal
-- `GET /evaluate` - Página de evaluación interactiva
+Desde la aplicación desplegada: **https://ai-judges-ai.up.railway.app/**
+
+- `GET /` - [Interfaz web principal](https://ai-judges-ai.up.railway.app/)
+- `GET /evaluate` - [Página de evaluación interactiva](https://ai-judges-ai.up.railway.app/evaluate)
 - `POST /api/v1/evaluate` - API de evaluación básica
 - `POST /api/v1/evaluate/detailed` - API de evaluación avanzada
 - `POST /api/v1/evaluate/compare` - Comparación de respuestas
-- `GET /api/v1/docs` - Documentación interactiva de la API
+- `GET /api/v1/docs` - [Documentación interactiva de la API](https://ai-judges-ai.up.railway.app/api/v1/docs)
 - `GET /health` - Health check para Railway
 
 **Próximo paso**: Despliega en Railway o ejecuta `uvicorn app.main:app --reload`
