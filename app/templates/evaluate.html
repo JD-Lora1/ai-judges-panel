@@ -1,0 +1,335 @@
+{% extends "base.html" %}
+
+{% block title %}Evaluación - AI Judges Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-5 text-gradient">
+                    <i class="fas fa-clipboard-check me-3"></i>
+                    Evaluación Inteligente
+                </h1>
+                <p class="lead">
+                    Ingresa tu prompt y respuesta para obtener una evaluación comprehensiva 
+                    usando nuestro panel de jueces especializados de IA
+                </p>
+            </div>
+
+            <!-- Evaluation Form -->
+            <div class="evaluation-form shadow-custom">
+                <form id="evaluation-form">
+                    <div class="mb-4">
+                        <label for="prompt" class="form-label">
+                            <i class="fas fa-question-circle me-2"></i>
+                            <strong>Prompt Original</strong>
+                        </label>
+                        <textarea 
+                            class="form-control" 
+                            id="prompt" 
+                            name="prompt" 
+                            rows="4" 
+                            placeholder="Escribe aquí la pregunta o tarea que fue planteada al LLM..."
+                            required
+                            minlength="10"
+                            maxlength="2000">
+                        </textarea>
+                        <div class="form-text">
+                            Ingresa la pregunta o instrucción original que se le dio al modelo de IA.
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="response" class="form-label">
+                            <i class="fas fa-robot me-2"></i>
+                            <strong>Respuesta del LLM</strong>
+                        </label>
+                        <textarea 
+                            class="form-control" 
+                            id="response" 
+                            name="response" 
+                            rows="8" 
+                            placeholder="Pega aquí la respuesta generada por el LLM que quieres evaluar..."
+                            required
+                            minlength="10"
+                            maxlength="5000">
+                        </textarea>
+                        <div class="form-text">
+                            Ingresa la respuesta completa que generó el modelo de IA.
+                        </div>
+                    </div>
+
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <label for="domain" class="form-label">
+                                <i class="fas fa-tag me-2"></i>
+                                <strong>Dominio (Opcional)</strong>
+                            </label>
+                            <select class="form-select" id="domain" name="domain">
+                                <option value="">Seleccionar dominio...</option>
+                                <option value="general">General</option>
+                                <option value="technical">Técnico</option>
+                                <option value="creative">Creativo</option>
+                                <option value="academic">Académico</option>
+                                <option value="business">Negocios</option>
+                                <option value="medical">Médico</option>
+                                <option value="legal">Legal</option>
+                                <option value="educational">Educativo</option>
+                            </select>
+                            <div class="form-text">
+                                Ayuda a contextualizar la evaluación.
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <label class="form-label">
+                                <i class="fas fa-cogs me-2"></i>
+                                <strong>Opciones Avanzadas</strong>
+                            </label>
+                            <div class="form-check mt-2">
+                                <input 
+                                    class="form-check-input" 
+                                    type="checkbox" 
+                                    id="include_automatic_metrics" 
+                                    name="include_automatic_metrics" 
+                                    checked>
+                                <label class="form-check-label" for="include_automatic_metrics">
+                                    Incluir métricas automáticas
+                                </label>
+                            </div>
+                            <div class="form-text">
+                                Incluye métricas adicionales de NLP cuando sea posible.
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Examples -->
+                    <div class="mb-4">
+                        <button type="button" class="btn btn-outline-info btn-sm" onclick="loadExample()">
+                            <i class="fas fa-lightbulb me-1"></i>Cargar Ejemplo
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary btn-sm ms-2" onclick="clearForm()">
+                            <i class="fas fa-eraser me-1"></i>Limpiar
+                        </button>
+                    </div>
+
+                    <!-- Submit Button -->
+                    <div class="text-center">
+                        <button type="submit" class="btn btn-primary btn-lg">
+                            <i class="fas fa-play me-2"></i>Evaluar Respuesta
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Loading Spinner -->
+            <div id="loading-spinner" class="text-center mt-4" style="display: none;">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Evaluando...</span>
+                </div>
+                <p class="mt-2 text-muted">
+                    Nuestro panel de jueces está analizando la respuesta...
+                </p>
+            </div>
+
+            <!-- Results Container -->
+            <div id="results-container" class="results-container fade-in" style="display: none;">
+                <!-- Results will be populated by JavaScript -->
+            </div>
+        </div>
+
+        <!-- Sidebar with Info -->
+        <div class="col-lg-4">
+            <div class="sticky-top" style="top: 2rem;">
+                <!-- Judge Info -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0">
+                            <i class="fas fa-users me-2"></i>Panel de Jueces
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row text-center">
+                            <div class="col-4 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-danger">🎯</div>
+                                    <small><strong>Precisión</strong></small>
+                                </div>
+                            </div>
+                            <div class="col-4 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-primary">🧠</div>
+                                    <small><strong>Coherencia</strong></small>
+                                </div>
+                            </div>
+                            <div class="col-4 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-warning">🎪</div>
+                                    <small><strong>Relevancia</strong></small>
+                                </div>
+                            </div>
+                            <div class="col-4 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-success">⚡</div>
+                                    <small><strong>Eficiencia</strong></small>
+                                </div>
+                            </div>
+                            <div class="col-4 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-info">🎨</div>
+                                    <small><strong>Creatividad</strong></small>
+                                </div>
+                            </div>
+                        </div>
+                        <small class="text-muted">
+                            Cada juez evalúa la respuesta desde su perspectiva especializada 
+                            usando modelos de Hugging Face.
+                        </small>
+                    </div>
+                </div>
+
+                <!-- Tips Card -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-success text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-tips me-2"></i>Consejos para Mejores Resultados
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-unstyled mb-0 small">
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                Incluye el prompt completo y específico
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                Pega la respuesta completa del LLM
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                Selecciona el dominio apropiado si conoces el contexto
+                            </li>
+                            <li class="mb-2">
+                                <i class="fas fa-check text-success me-2"></i>
+                                La evaluación toma 10-30 segundos
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+
+                <!-- API Info -->
+                <div class="card shadow-sm">
+                    <div class="card-header bg-info text-white">
+                        <h6 class="mb-0">
+                            <i class="fas fa-code me-2"></i>¿Desarrollador?
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="small mb-2">
+                            Utiliza nuestra API REST para integrar la evaluación 
+                            en tu aplicación.
+                        </p>
+                        <a href="/api/v1/docs" target="_blank" class="btn btn-outline-info btn-sm">
+                            <i class="fas fa-external-link-alt me-1"></i>Ver Documentación
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.judge-mini-card {
+    padding: 10px;
+    border-radius: 8px;
+    background: #f8f9fa;
+    transition: all 0.3s ease;
+}
+
+.judge-mini-card:hover {
+    background: #e9ecef;
+    transform: scale(1.05);
+}
+
+.judge-icon {
+    font-size: 1.5rem;
+    margin-bottom: 5px;
+}
+
+.sticky-top {
+    position: -webkit-sticky;
+    position: sticky;
+}
+
+@media (max-width: 991px) {
+    .sticky-top {
+        position: relative;
+        top: auto !important;
+    }
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Load example data
+function loadExample() {
+    document.getElementById('prompt').value = `Explica qué es la inteligencia artificial y cómo está transformando diferentes industrias en la actualidad. Incluye ejemplos específicos y menciona tanto beneficios como desafíos.`;
+    
+    document.getElementById('response').value = `La inteligencia artificial (IA) es una rama de la ciencia de la computación que se enfoca en crear sistemas capaces de realizar tareas que tradicionalmente requieren inteligencia humana, como el aprendizaje, el reconocimiento de patrones, la toma de decisiones y el procesamiento del lenguaje natural.
+
+**Transformación por industrias:**
+
+**Salud:** Los algoritmos de IA ayudan en el diagnóstico médico mediante el análisis de imágenes médicas, predicen brotes de enfermedades y personalizan tratamientos. Por ejemplo, Google's DeepMind ha desarrollado sistemas que pueden detectar más de 50 enfermedades oculares.
+
+**Finanzas:** Los bancos utilizan IA para detectar fraudes en tiempo real, automatizar el trading algorítmico y evaluar riesgos crediticios. JPMorgan Chase usa IA para analizar contratos legales en segundos.
+
+**Transporte:** Los vehículos autónomos de Tesla y Waymo están revolucionando la movilidad. Los sistemas de optimización de rutas en aplicaciones como Waze utilizan IA para reducir tiempos de viaje.
+
+**Educación:** Plataformas como Khan Academy usan IA para personalizar el aprendizaje, adaptando el contenido al ritmo y estilo de cada estudiante.
+
+**Beneficios principales:**
+- Automatización de tareas repetitivas
+- Mayor precisión en análisis complejos
+- Disponibilidad 24/7
+- Procesamiento de grandes volúmenes de datos
+
+**Desafíos importantes:**
+- Pérdida potencial de empleos
+- Sesgo algorítmico
+- Privacidad y seguridad de datos
+- Dependencia tecnológica
+- Falta de transparencia en decisiones algorítmicas
+
+La IA continuará evolucionando, siendo crucial equilibrar la innovación con consideraciones éticas y sociales.`;
+    
+    document.getElementById('domain').value = 'technical';
+    
+    // Auto-resize textareas
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.style.height = 'auto';
+        textarea.style.height = (textarea.scrollHeight) + 'px';
+    });
+}
+
+// Clear form
+function clearForm() {
+    document.getElementById('evaluation-form').reset();
+    document.querySelectorAll('textarea').forEach(textarea => {
+        textarea.style.height = 'auto';
+    });
+    hideResults();
+}
+
+// Auto-resize textareas on input
+document.querySelectorAll('textarea').forEach(textarea => {
+    textarea.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
+    });
+});
+</script>
+{% endblock %}

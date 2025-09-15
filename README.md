@@ -176,27 +176,49 @@ ai-judges-panel/
 
 ## 🚀 Quick Start
 
+### Opción 1: Aplicación Web (Recomendado)
+
+```bash
+# Instalar dependencias
+pip install -r requirements.txt
+
+# Ejecutar aplicación web
+uvicorn app.main:app --reload
+
+# Abrir en navegador: http://localhost:8000
+```
+
+### Opción 2: API Programática
+
 ```python
-from src.evaluators.meta_evaluator import MetaEvaluator
+import asyncio
+from app.models.hf_judges import HuggingFaceJudgesPanel
 
-# Inicializar el sistema de evaluación
-evaluator = MetaEvaluator()
+# Inicializar el panel de jueces con modelos de HuggingFace
+async def main():
+    panel = HuggingFaceJudgesPanel()
+    await panel.initialize()
+    
+    # Evaluar una respuesta
+    result = await panel.evaluate(
+        prompt="Explica la inteligencia artificial",
+        response="La IA es un campo de la informática..."
+    )
+    
+    print(f"Score Final: {result.final_score:.1f}/10")
+    print(f"Consenso: {result.consensus_level:.1%}")
+    for aspect, score in result.individual_scores.items():
+        print(f"{aspect.title()}: {score:.1f}/10")
 
-# Evaluar una respuesta
-prompt = "Explica la relatividad de Einstein"
-candidate_response = "E=mc² es una ecuación famosa..."
+# Ejecutar
+asyncio.run(main())
+```
 
-# Obtener evaluación completa
-evaluation = evaluator.evaluate(
-    prompt=prompt,
-    response=candidate_response,
-    include_automatic_metrics=True
-)
+### Opción 3: Notebooks de Investigación
 
-# Mostrar resultados
-print(f"Score Final: {evaluation.final_score}/10")
-print(f"Fortalezas: {evaluation.strengths}")
-print(f"Áreas de Mejora: {evaluation.improvements}")
+```bash
+# Ejecutar notebooks originales
+jupyter notebook notebooks/01_demo_basic.ipynb
 ```
 
 ## 🎪 ¿Por Qué Esta Arquitectura es Innovadora?
@@ -215,4 +237,36 @@ print(f"Áreas de Mejora: {evaluation.improvements}")
 
 *Este proyecto representa la evolución natural de la evaluación de IA: de métricas simples a juicios inteligentes especializados.*
 
-**Próximo paso**: `cd notebooks && jupyter notebook 01_demo_basic.ipynb`
+## 🚀 Despliegue en Railway
+
+### Despliegue Automático
+
+1. **Fork el repositorio** en GitHub
+2. **Conecta con Railway**: 
+   - Ve a [railway.app](https://railway.app)
+   - Conecta tu cuenta de GitHub
+   - Selecciona este repositorio
+3. **Configuración automática**:
+   - Railway detectará automáticamente el `railway.toml`
+   - La aplicación se desplegará con FastAPI + Uvicorn
+   - Los modelos de HuggingFace se cargarán en el primer arranque
+
+### Variables de Entorno (Opcionales)
+
+```bash
+ENVIRONMENT=production
+PYTHONPATH=.
+# HF_TOKEN=your_huggingface_token  # Si usas modelos privados
+```
+
+### Endpoints Disponibles
+
+- `GET /` - Interfaz web principal
+- `GET /evaluate` - Página de evaluación interactiva
+- `POST /api/v1/evaluate` - API de evaluación básica
+- `POST /api/v1/evaluate/detailed` - API de evaluación avanzada
+- `POST /api/v1/evaluate/compare` - Comparación de respuestas
+- `GET /api/v1/docs` - Documentación interactiva de la API
+- `GET /health` - Health check para Railway
+
+**Próximo paso**: Despliega en Railway o ejecuta `uvicorn app.main:app --reload`

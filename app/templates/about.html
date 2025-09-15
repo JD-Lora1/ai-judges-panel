@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+
+{% block title %}Acerca de - AI Judges Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-lg-10 mx-auto">
+            <!-- Header -->
+            <div class="text-center mb-5">
+                <h1 class="display-4 text-gradient">
+                    <i class="fas fa-info-circle me-3"></i>
+                    Acerca del AI Judges Panel
+                </h1>
+                <p class="lead">
+                    Una arquitectura multi-agente para evaluación de LLMs usando modelos especializados de Hugging Face
+                </p>
+            </div>
+
+            <!-- Architecture Overview -->
+            <div class="card shadow-custom mb-5">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-sitemap me-2"></i>
+                        Arquitectura del Sistema
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>🏗️ Componentes Principales</h5>
+                            <ul class="list-unstyled">
+                                <li class="mb-2">
+                                    <strong>🎯 Jueces Especializados:</strong> 5 evaluadores con expertise específico
+                                </li>
+                                <li class="mb-2">
+                                    <strong>🧠 Modelos HuggingFace:</strong> BERT, SentenceTransformers, modelos de NLP
+                                </li>
+                                <li class="mb-2">
+                                    <strong>⚖️ Meta-Evaluador:</strong> Combina y pondera las evaluaciones individuales
+                                </li>
+                                <li class="mb-2">
+                                    <strong>🌐 Interfaz Web:</strong> FastAPI con interfaz Bootstrap responsiva
+                                </li>
+                                <li class="mb-2">
+                                    <strong>📊 API REST:</strong> Endpoints para integración programática
+                                </li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>🔄 Flujo de Evaluación</h5>
+                            <div class="evaluation-flow">
+                                <div class="flow-step">
+                                    <div class="step-number">1</div>
+                                    <div class="step-content">
+                                        <strong>Input:</strong> Prompt + Respuesta del LLM
+                                    </div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-step">
+                                    <div class="step-number">2</div>
+                                    <div class="step-content">
+                                        <strong>Evaluación:</strong> 5 Jueces analizan en paralelo
+                                    </div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-step">
+                                    <div class="step-number">3</div>
+                                    <div class="step-content">
+                                        <strong>Agregación:</strong> Combina scores y consensus
+                                    </div>
+                                </div>
+                                <div class="flow-arrow">↓</div>
+                                <div class="flow-step">
+                                    <div class="step-number">4</div>
+                                    <div class="step-content">
+                                        <strong>Output:</strong> Reporte comprehensivo
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Judges Panel -->
+            <div class="card shadow-custom mb-5">
+                <div class="card-header bg-success text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-users me-2"></i>
+                        Panel de Jueces Especializados
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-lg-6 mb-4">
+                            <div class="judge-detail-card">
+                                <div class="judge-header">
+                                    <span class="judge-emoji">🎯</span>
+                                    <h5>Dr. Precisión</h5>
+                                </div>
+                                <p><strong>Especialidad:</strong> Factualidad y exactitud</p>
+                                <p><strong>Evalúa:</strong></p>
+                                <ul class="small">
+                                    <li>Veracidad de hechos presentados</li>
+                                    <li>Ausencia de alucinaciones</li>
+                                    <li>Precisión en datos numéricos y fechas</li>
+                                    <li>Correctitud de referencias</li>
+                                </ul>
+                                <p><strong>Técnica:</strong> Análisis heurístico + detección de patrones</p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6 mb-4">
+                            <div class="judge-detail-card">
+                                <div class="judge-header">
+                                    <span class="judge-emoji">🧠</span>
+                                    <h5>Prof. Coherencia</h5>
+                                </div>
+                                <p><strong>Especialidad:</strong> Lógica interna y estructura</p>
+                                <p><strong>Evalúa:</strong></p>
+                                <ul class="small">
+                                    <li>Flujo lógico entre ideas</li>
+                                    <li>Consistencia argumentativa</li>
+                                    <li>Transiciones suaves</li>
+                                    <li>Estructura narrativa</li>
+                                </ul>
+                                <p><strong>Técnica:</strong> SentenceTransformers + análisis semántico</p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6 mb-4">
+                            <div class="judge-detail-card">
+                                <div class="judge-header">
+                                    <span class="judge-emoji">🎪</span>
+                                    <h5>Lic. Relevancia</h5>
+                                </div>
+                                <p><strong>Especialidad:</strong> Pertinencia a la pregunta</p>
+                                <p><strong>Evalúa:</strong></p>
+                                <ul class="small">
+                                    <li>Abordaje directo de la pregunta</li>
+                                    <li>Completitud de la respuesta</li>
+                                    <li>Mantenimiento del foco temático</li>
+                                    <li>Eliminación de información tangencial</li>
+                                </ul>
+                                <p><strong>Técnica:</strong> Similitud semántica BERT-based</p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6 mb-4">
+                            <div class="judge-detail-card">
+                                <div class="judge-header">
+                                    <span class="judge-emoji">⚡</span>
+                                    <h5>Ed. Eficiencia</h5>
+                                </div>
+                                <p><strong>Especialidad:</strong> Claridad y concisión</p>
+                                <p><strong>Evalúa:</strong></p>
+                                <ul class="small">
+                                    <li>Longitud apropiada del contenido</li>
+                                    <li>Claridad del lenguaje</li>
+                                    <li>Legibilidad y comprensión</li>
+                                    <li>Variedad en estructura de oraciones</li>
+                                </ul>
+                                <p><strong>Técnica:</strong> Métricas de legibilidad + análisis textual</p>
+                            </div>
+                        </div>
+
+                        <div class="col-lg-6 mb-4">
+                            <div class="judge-detail-card">
+                                <div class="judge-header">
+                                    <span class="judge-emoji">🎨</span>
+                                    <h5>Dra. Creatividad</h5>
+                                </div>
+                                <p><strong>Especialidad:</strong> Originalidad e innovación</p>
+                                <p><strong>Evalúa:</strong></p>
+                                <ul class="small">
+                                    <li>Diversidad léxica</li>
+                                    <li>Uso de ejemplos originales</li>
+                                    <li>Perspectivas únicas</li>
+                                    <li>Elementos creativos del lenguaje</li>
+                                </ul>
+                                <p><strong>Técnica:</strong> Análisis de diversidad + detección de creatividad</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Technical Details -->
+            <div class="row mb-5">
+                <div class="col-md-6">
+                    <div class="card shadow-custom">
+                        <div class="card-header bg-info text-white">
+                            <h4 class="mb-0">
+                                <i class="fas fa-cogs me-2"></i>
+                                Tecnologías
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <h6>🚀 Backend:</h6>
+                            <ul class="small">
+                                <li><strong>FastAPI:</strong> Framework web moderno y rápido</li>
+                                <li><strong>Uvicorn:</strong> Servidor ASGI de alta performance</li>
+                                <li><strong>Pydantic:</strong> Validación de datos con tipos</li>
+                            </ul>
+
+                            <h6>🤖 Modelos de IA:</h6>
+                            <ul class="small">
+                                <li><strong>HuggingFace Transformers:</strong> Modelos pre-entrenados</li>
+                                <li><strong>SentenceTransformers:</strong> Embeddings semánticos</li>
+                                <li><strong>Scikit-learn:</strong> Métricas y análisis</li>
+                            </ul>
+
+                            <h6>🌐 Frontend:</h6>
+                            <ul class="small">
+                                <li><strong>Bootstrap 5:</strong> Framework CSS responsivo</li>
+                                <li><strong>Chart.js:</strong> Visualizaciones interactivas</li>
+                                <li><strong>Font Awesome:</strong> Iconografía</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card shadow-custom">
+                        <div class="card-header bg-warning text-dark">
+                            <h4 class="mb-0">
+                                <i class="fas fa-chart-line me-2"></i>
+                                Características
+                            </h4>
+                        </div>
+                        <div class="card-body">
+                            <h6>✨ Evaluación Multi-Dimensional:</h6>
+                            <p class="small">Cada aspecto evaluado por un especialista, evitando sesgos de evaluación monolítica.</p>
+
+                            <h6>📈 Interpretabilidad Completa:</h6>
+                            <p class="small">Cada juez explica su calificación con feedback específico y accionable.</p>
+
+                            <h6>🔧 Escalabilidad Modular:</h6>
+                            <p class="small">Fácil agregar nuevos jueces especializados y ajustar pesos según contexto.</p>
+
+                            <h6>🛡️ Robustez Contra Sesgos:</h6>
+                            <p class="small">Múltiples perspectivas reducen sesgos individuales, consenso emergente más confiable.</p>
+
+                            <h6>🚀 Despliegue en la Nube:</h6>
+                            <p class="small">Optimizado para Railway con configuración automática y health checks.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- API Documentation -->
+            <div class="card shadow-custom mb-5">
+                <div class="card-header bg-secondary text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-code me-2"></i>
+                        API y Documentación
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>📊 Endpoints Principales:</h5>
+                            <div class="endpoint-list">
+                                <div class="endpoint-item">
+                                    <code class="method-post">POST</code>
+                                    <code>/api/v1/evaluate</code>
+                                    <p class="small">Evaluación básica de prompt + respuesta</p>
+                                </div>
+                                <div class="endpoint-item">
+                                    <code class="method-post">POST</code>
+                                    <code>/api/v1/evaluate/detailed</code>
+                                    <p class="small">Evaluación con opciones avanzadas</p>
+                                </div>
+                                <div class="endpoint-item">
+                                    <code class="method-post">POST</code>
+                                    <code>/api/v1/evaluate/compare</code>
+                                    <p class="small">Comparación de múltiples respuestas</p>
+                                </div>
+                                <div class="endpoint-item">
+                                    <code class="method-post">POST</code>
+                                    <code>/api/v1/evaluate/batch</code>
+                                    <p class="small">Evaluación por lotes</p>
+                                </div>
+                                <div class="endpoint-item">
+                                    <code class="method-get">GET</code>
+                                    <code>/api/v1/judges</code>
+                                    <p class="small">Información del panel de jueces</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>📚 Recursos:</h5>
+                            <div class="resources-list">
+                                <a href="/api/v1/docs" target="_blank" class="btn btn-outline-primary mb-2 d-block">
+                                    <i class="fas fa-book me-2"></i>
+                                    Documentación Interactiva (Swagger)
+                                </a>
+                                <a href="https://github.com/your-repo" target="_blank" class="btn btn-outline-secondary mb-2 d-block">
+                                    <i class="fab fa-github me-2"></i>
+                                    Código Fuente en GitHub
+                                </a>
+                                <a href="/notebooks" class="btn btn-outline-info mb-2 d-block">
+                                    <i class="fas fa-code me-2"></i>
+                                    Notebooks de Investigación
+                                </a>
+                            </div>
+
+                            <h6>🔧 Ejemplo de Uso:</h6>
+                            <pre class="bg-light p-3 rounded small"><code>curl -X POST "https://your-app.railway.app/api/v1/evaluate" \\
+-H "Content-Type: application/json" \\
+-d '{
+  "prompt": "Explica la IA",
+  "response": "La IA es...",
+  "domain": "technical"
+}'</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Future Work -->
+            <div class="card shadow-custom mb-5">
+                <div class="card-header bg-dark text-white">
+                    <h3 class="mb-0">
+                        <i class="fas fa-road me-2"></i>
+                        Roadmap y Futuras Mejoras
+                    </h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <h6>🚧 En Desarrollo:</h6>
+                            <ul class="small">
+                                <li>Integración con APIs de LLM reales (GPT, Claude)</li>
+                                <li>Métricas automáticas adicionales (BLEU, ROUGE, BERTScore)</li>
+                                <li>Sistema de caché distribuido con Redis</li>
+                                <li>Base de datos para historial de evaluaciones</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>🔮 Planeado:</h6>
+                            <ul class="small">
+                                <li>Jueces especializados por dominio</li>
+                                <li>Evaluación de código generado</li>
+                                <li>Sistema de feedback por usuarios</li>
+                                <li>Dashboard de analytics avanzado</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-4">
+                            <h6>💡 Investigación:</h6>
+                            <ul class="small">
+                                <li>Meta-learning para optimización de pesos</li>
+                                <li>Evaluación adversarial</li>
+                                <li>Detección de bias en evaluaciones</li>
+                                <li>Integración con modelos multimodales</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.judge-detail-card {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    border-left: 4px solid #007bff;
+    height: 100%;
+}
+
+.judge-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.judge-emoji {
+    font-size: 2rem;
+    margin-right: 15px;
+}
+
+.evaluation-flow {
+    text-align: center;
+}
+
+.flow-step {
+    background: #e9ecef;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+}
+
+.flow-arrow {
+    font-size: 1.5rem;
+    color: #007bff;
+    margin: 10px 0;
+}
+
+.endpoint-item {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.method-get {
+    background: #28a745;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 10px;
+}
+
+.method-post {
+    background: #007bff;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    margin-right: 10px;
+}
+
+.resources-list a {
+    text-decoration: none;
+}
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Add some interactive elements if needed
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate judge cards on scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver(function(entries) {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.judge-detail-card').forEach(card => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        card.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+        observer.observe(card);
+    });
+});
+</script>
+{% endblock %}

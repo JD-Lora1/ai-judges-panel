@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Error {{ error_code }} - AI Judges Panel{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-6 text-center">
+            <div class="error-container">
+                <!-- Error Icon -->
+                <div class="error-icon mb-4">
+                    {% if error_code == 404 %}
+                        <i class="fas fa-search fa-5x text-muted"></i>
+                    {% elif error_code == 500 %}
+                        <i class="fas fa-exclamation-triangle fa-5x text-warning"></i>
+                    {% else %}
+                        <i class="fas fa-question-circle fa-5x text-muted"></i>
+                    {% endif %}
+                </div>
+
+                <!-- Error Message -->
+                <h1 class="display-1 text-primary">{{ error_code }}</h1>
+                <h2 class="mb-4">
+                    {% if error_code == 404 %}
+                        Página No Encontrada
+                    {% elif error_code == 500 %}
+                        Error Interno del Servidor
+                    {% else %}
+                        Error
+                    {% endif %}
+                </h2>
+                
+                <p class="lead text-muted mb-4">
+                    {% if error_code == 404 %}
+                        Lo sentimos, la página que buscas no existe o ha sido movida.
+                    {% elif error_code == 500 %}
+                        Ha ocurrido un error interno. Nuestro equipo ha sido notificado.
+                    {% else %}
+                        {{ error_message }}
+                    {% endif %}
+                </p>
+
+                <!-- Action Buttons -->
+                <div class="error-actions">
+                    <a href="/" class="btn btn-primary me-3">
+                        <i class="fas fa-home me-2"></i>Ir al Inicio
+                    </a>
+                    
+                    {% if error_code == 404 %}
+                    <a href="/evaluate" class="btn btn-outline-primary me-3">
+                        <i class="fas fa-clipboard-check me-2"></i>Evaluar Texto
+                    </a>
+                    {% endif %}
+                    
+                    <button class="btn btn-outline-secondary" onclick="history.back()">
+                        <i class="fas fa-arrow-left me-2"></i>Volver Atrás
+                    </button>
+                </div>
+
+                <!-- Additional Help -->
+                <div class="mt-5">
+                    <h5>¿Necesitas ayuda?</h5>
+                    <p class="small text-muted">
+                        Si el problema persiste, puedes:
+                    </p>
+                    <ul class="list-inline">
+                        <li class="list-inline-item">
+                            <a href="/about" class="text-decoration-none">
+                                <i class="fas fa-info-circle me-1"></i>Ver documentación
+                            </a>
+                        </li>
+                        <li class="list-inline-item">
+                            <span class="text-muted">|</span>
+                        </li>
+                        <li class="list-inline-item">
+                            <a href="/api/v1/docs" target="_blank" class="text-decoration-none">
+                                <i class="fas fa-code me-1"></i>Revisar API
+                            </a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.error-container {
+    padding: 60px 20px;
+}
+
+.error-icon {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+.error-actions {
+    margin-top: 30px;
+}
+
+@media (max-width: 768px) {
+    .error-actions .btn {
+        display: block;
+        margin-bottom: 10px;
+    }
+    
+    .error-actions .me-3 {
+        margin-right: 0 !important;
+    }
+}
+</style>
+{% endblock %}
