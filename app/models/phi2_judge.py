@@ -1,6 +1,6 @@
 """
-GPT-2 Based AI Judge Implementation
-Single, efficient LLM judge using OpenAI GPT-2 model for evaluation tasks.
+Specialized LLM Judge Implementation
+Single, efficient LLM judge using fine-tuned model specifically trained for evaluation tasks.
 """
 
 import torch
@@ -14,29 +14,29 @@ import gc
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class GPT2Judge:
+class LLMJudge:
     """
-    Single AI judge using OpenAI GPT-2 model for comprehensive evaluation.
-    Optimized for resource efficiency and performance.
+    Single AI judge using specialized LLM model fine-tuned for evaluation tasks.
+    Provides accurate and contextual evaluation of responses.
     """
     
     def __init__(self):
         self.model = None
         self.tokenizer = None
-        self.model_name = "openai-community/gpt2"
+        self.model_name = "vwxyzjn/online_dpo_llmjudge"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.max_length = 150  # Short responses for efficiency
+        self.max_length = 200  # Longer for proper judge responses
         self.model_loaded = False
         
-        logger.info(f"GPT2Judge initialized - Device: {self.device}")
+        logger.info(f"LLMJudge initialized - Device: {self.device}")
     
     def _load_model(self):
-        """Load the GPT-2 model and tokenizer (lazy loading)"""
+        """Load the specialized LLM judge model and tokenizer (lazy loading)"""
         if self.model_loaded:
             return
             
         try:
-            logger.info(f"Loading GPT-2 model from {self.model_name}")
+            logger.info(f"Loading LLM Judge model from {self.model_name}")
             start_time = time.time()
             
             # Load tokenizer
@@ -52,6 +52,7 @@ class GPT2Judge:
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
+                device_map="auto" if self.device == "cuda" else None
             )
             
             if self.device == "cpu":
@@ -61,15 +62,15 @@ class GPT2Judge:
             self.model.eval()
             
             load_time = time.time() - start_time
-            logger.info(f"GPT-2 model loaded successfully in {load_time:.2f} seconds")
+            logger.info(f"LLM Judge model loaded successfully in {load_time:.2f} seconds")
             self.model_loaded = True
             
         except Exception as e:
-            logger.error(f"Failed to load GPT-2 model: {e}")
+            logger.error(f"Failed to load specialized LLM judge model: {e}")
             raise RuntimeError(f"Model loading failed: {e}")
     
     def _generate_evaluation(self, prompt: str, response: str, aspect: str) -> Dict[str, Any]:
-        """Generate evaluation for a specific aspect using GPT-2 as a conversational evaluator"""
+        """Generate evaluation for a specific aspect using specialized LLM judge"""
         if not self.model_loaded:
             try:
                 self._load_model()
@@ -82,30 +83,41 @@ class GPT2Judge:
                     "error": True
                 }
         
-        # Create a simple evaluation prompt that works better with GPT-2
-        evaluation_prompt = f"""Question: {prompt[:150]}
-Answer: {response[:200]}
+        # Create a proper evaluation prompt for LLM judge
+        evaluation_prompt = f"""Please evaluate the following answer based on its {aspect}.
 
-Rate the {aspect} of this answer from 1 to 10:
-Score: """
+User Question: {prompt}
+
+Assistant Answer: {response}
+
+Please rate the {aspect} of this answer on a scale from 1 to 10, where:
+- 1-3: Poor {aspect}
+- 4-6: Average {aspect} 
+- 7-8: Good {aspect}
+- 9-10: Excellent {aspect}
+
+Provide your rating as a number followed by a brief explanation.
+
+Rating: """
 
         try:
-            # Tokenize input with simple parameters
+            # Tokenize input with proper context length
             inputs = self.tokenizer(
                 evaluation_prompt,
                 return_tensors="pt",
                 truncation=True,
-                max_length=400,  # Shorter context
+                max_length=1024,  # Longer context for better evaluation
                 padding=True
             ).to(self.device)
             
-            # Generate response with simple, deterministic parameters
+            # Generate response optimized for judge model
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=20,  # Very short - just need a number
-                    do_sample=False,  # Deterministic
-                    temperature=1.0,
+                    max_new_tokens=50,  # Enough for score and brief explanation
+                    do_sample=True,  # Allow some variation
+                    temperature=0.3,  # Low temperature for consistent evaluation
+                    top_p=0.95,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     early_stopping=True
@@ -117,7 +129,7 @@ Score: """
                 skip_special_tokens=True
             ).strip()
             
-            logger.info(f"GPT-2 raw response for {aspect}: {generated_text[:100]}...")
+            logger.info(f"LLM Judge raw response for {aspect}: {generated_text[:100]}...")
             
             # Extract score and feedback
             score, feedback = self._parse_evaluation_response(generated_text, aspect)
@@ -193,8 +205,8 @@ Score: """
                 logger.warning(f"Could not extract score from response: {response_text[:100]}...")
                 return None, f"Failed to parse {aspect} evaluation from: {response_text[:100]}..."
             
-            # Simple feedback
-            feedback = f"LLM Score: {score}/10 for {aspect}. Generated: {response_text[:50]}..."
+            # Create feedback with LLM judge response
+            feedback = f"Judge Score: {score}/10 for {aspect}. {response_text[:100] if response_text else 'No detailed feedback'}"
             
             return score, feedback
             
@@ -377,8 +389,8 @@ Score: """
             "device": self.device,
             "max_length": self.max_length,
             "available_aspects": ["relevance", "coherence", "accuracy", "completeness"],
-            "model_parameters": "124M",
-            "model_description": "OpenAI GPT-2 - Lightweight transformer model for text generation and evaluation"
+            "model_parameters": "7B",
+            "model_description": "Specialized LLM Judge - Fine-tuned for evaluating response quality and relevance"
         }
     
     def unload_model(self):
@@ -398,15 +410,17 @@ Score: """
 
 
 # Singleton instance for efficient resource usage
-_gpt2_judge_instance = None
+_llm_judge_instance = None
 
-def get_gpt2_judge() -> GPT2Judge:
-    """Get singleton instance of GPT2Judge"""
-    global _gpt2_judge_instance
-    if _gpt2_judge_instance is None:
-        _gpt2_judge_instance = GPT2Judge()
-    return _gpt2_judge_instance
+def get_llm_judge() -> LLMJudge:
+    """Get singleton instance of LLMJudge"""
+    global _llm_judge_instance
+    if _llm_judge_instance is None:
+        _llm_judge_instance = LLMJudge()
+    return _llm_judge_instance
 
 # Keep backward compatibility
-get_phi2_judge = get_gpt2_judge
-Phi2Judge = GPT2Judge
+get_phi2_judge = get_llm_judge
+get_gpt2_judge = get_llm_judge
+Phi2Judge = LLMJudge
+GPT2Judge = LLMJudge

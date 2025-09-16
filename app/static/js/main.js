@@ -386,24 +386,8 @@ function initializeTooltips() {
     });
 }
 
-async function loadAvailableModels() {
-    try {
-        const response = await fetch('/api/v1/models/available');
-        const data = await response.json();
-        availableModels = data.available_models;
-        
-        // Update model selector if present
-        const modelSelector = document.getElementById('llm_model');
-        if (modelSelector && availableModels.length > 0) {
-            modelSelector.innerHTML = availableModels.map(model => 
-                `<option value="${model.id}">${model.name}</option>`
-            ).join('');
-        }
-        
-    } catch (error) {
-        console.warn('Could not load available models:', error);
-    }
-}
+// Model info is now static - using GPT-2 only
+// No need to load dynamic model list
 
 async function checkSystemStatus() {
     try {

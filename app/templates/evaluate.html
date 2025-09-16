@@ -105,35 +105,15 @@
                         </div>
                     </div>
 
-                    <!-- Model Selection -->
+                    <!-- Model Information -->
                     <div class="row mb-4">
-                        <div class="col-md-6">
-                            <label for="model_type" class="form-label">
-                                <i class="fas fa-brain me-2"></i>
-                                <strong>Tipo de Evaluación</strong>
-                            </label>
-                            <select class="form-select" id="model_type" name="model_type" onchange="toggleModelSelector()">
-                                <option value="hf">HuggingFace Judges (rápido)</option>
-                                <option value="llm">LLM Judges (contextual)</option>
-                            </select>
-                            <div class="form-text">
-                                LLM Judges evalúan mejor la relación prompt-respuesta pero son más lentos.
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-6" id="llm_model_container" style="display: none;">
-                            <label for="llm_model" class="form-label">
-                                <i class="fas fa-microchip me-2"></i>
-                                <strong>Modelo LLM</strong>
-                            </label>
-                            <select class="form-select" id="llm_model" name="llm_model">
-                                <option value="distilgpt2">DistilGPT2 (RECOMENDADO - ~5s)</option>
-                                <option value="microsoft/DialoGPT-small">DialoGPT Small (~8s)</option>
-                                <option value="google/flan-t5-base">FLAN-T5 Base (~12s)</option>
-                                <option value="microsoft/DialoGPT-medium">DialoGPT Medium (~20s)</option>
-                            </select>
-                            <div class="form-text">
-                                DistilGPT2 es rápido y eficiente para evaluación contextual. Tiempos estimados tras la primera carga.
+                        <div class="col-12">
+                            <div class="alert alert-info d-flex align-items-center">
+                                <i class="fas fa-robot fa-2x me-3"></i>
+                                <div>
+                                    <strong>Modelo de Evaluación:</strong> OpenAI GPT-2<br>
+                                    <small class="text-muted">Evaluación contextual usando inteligencia artificial. Tiempo estimado: ~5-8 segundos.</small>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -180,45 +160,39 @@
                 <div class="card shadow-sm mb-4">
                     <div class="card-header bg-primary text-white">
                         <h5 class="mb-0">
-                            <i class="fas fa-users me-2"></i>Panel de Jueces
+                            <i class="fas fa-robot me-2"></i>GPT-2 AI Judge
                         </h5>
                     </div>
                     <div class="card-body">
                         <div class="row text-center">
-                            <div class="col-4 mb-3">
-                                <div class="judge-mini-card">
-                                    <div class="judge-icon text-danger">🎯</div>
-                                    <small><strong>Precisión</strong></small>
-                                </div>
-                            </div>
-                            <div class="col-4 mb-3">
-                                <div class="judge-mini-card">
-                                    <div class="judge-icon text-primary">🧠</div>
-                                    <small><strong>Coherencia</strong></small>
-                                </div>
-                            </div>
-                            <div class="col-4 mb-3">
+                            <div class="col-6 mb-3">
                                 <div class="judge-mini-card">
                                     <div class="judge-icon text-warning">🎪</div>
                                     <small><strong>Relevancia</strong></small>
                                 </div>
                             </div>
-                            <div class="col-4 mb-3">
+                            <div class="col-6 mb-3">
                                 <div class="judge-mini-card">
-                                    <div class="judge-icon text-success">⚡</div>
-                                    <small><strong>Eficiencia</strong></small>
+                                    <div class="judge-icon text-primary">🧠</div>
+                                    <small><strong>Coherencia</strong></small>
                                 </div>
                             </div>
-                            <div class="col-4 mb-3">
+                            <div class="col-6 mb-3">
                                 <div class="judge-mini-card">
-                                    <div class="judge-icon text-info">🎨</div>
-                                    <small><strong>Creatividad</strong></small>
+                                    <div class="judge-icon text-danger">🎯</div>
+                                    <small><strong>Precisión</strong></small>
+                                </div>
+                            </div>
+                            <div class="col-6 mb-3">
+                                <div class="judge-mini-card">
+                                    <div class="judge-icon text-success">✅</div>
+                                    <small><strong>Completitud</strong></small>
                                 </div>
                             </div>
                         </div>
                         <small class="text-muted">
-                            Cada juez evalúa la respuesta desde su perspectiva especializada 
-                            usando modelos de Hugging Face.
+                            GPT-2 evalúa la respuesta en estos cuatro aspectos clave 
+                            utilizando evaluación contextual con inteligencia artificial.
                         </small>
                     </div>
                 </div>
@@ -357,17 +331,7 @@ function clearForm() {
     hideResults();
 }
 
-// Toggle model selector visibility
-function toggleModelSelector() {
-    const modelType = document.getElementById('model_type').value;
-    const llmContainer = document.getElementById('llm_model_container');
-    
-    if (modelType === 'llm') {
-        llmContainer.style.display = 'block';
-    } else {
-        llmContainer.style.display = 'none';
-    }
-}
+// No model selector needed - using GPT-2 only
 
 // Auto-resize textareas on input
 document.querySelectorAll('textarea').forEach(textarea => {
