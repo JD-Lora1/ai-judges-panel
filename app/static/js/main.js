@@ -123,14 +123,14 @@ function displayResults(evaluation) {
     
     resultsContainer.innerHTML = `
         <div class="results-header text-center mb-4">
-            <h3><i class="fas fa-chart-line me-2"></i>Resultados de la Evaluación Phi-2</h3>
+            <h3><i class="fas fa-chart-line me-2"></i>Resultados de la Evaluación GPT-2</h3>
             <div class="score-display ${scoreClass}">
                 ${overallScore.toFixed(1)}/10
             </div>
             <div class="consensus-info">
                 <span class="badge bg-info">
                     <i class="fas fa-robot me-1"></i>
-                    Phi-2 Model
+                    GPT-2 Model
                 </span>
                 <span class="badge bg-secondary ms-2">
                     <i class="fas fa-clock me-1"></i>
@@ -615,15 +615,15 @@ function generateWeightsDisplay(weights) {
     }).join('');
 }
 
-// Update share results for Phi-2
+// Update share results for GPT-2
 function shareResults() {
     if (!currentEvaluation) return;
     
-    const shareText = `AI Judges Panel (Phi-2) - Score: ${currentEvaluation.overall_score.toFixed(1)}/10`;
+    const shareText = `AI Judges Panel (GPT-2) - Score: ${currentEvaluation.overall_score.toFixed(1)}/10`;
     
     if (navigator.share) {
         navigator.share({
-            title: 'Evaluación AI Judges Panel - Phi-2',
+            title: 'Evaluación AI Judges Panel - GPT-2',
             text: shareText,
             url: window.location.href
         });

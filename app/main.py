@@ -2,7 +2,7 @@
 AI Judges Panel - Web Application
 =================================
 
-FastAPI application for deploying the AI Judges Panel system with Microsoft Phi-2 model.
+FastAPI application for deploying the AI Judges Panel system with OpenAI GPT-2 model.
 """
 
 from fastapi import FastAPI, HTTPException, Request
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 # Initialize FastAPI app
 app = FastAPI(
-    title="AI Judges Panel - Phi-2",
-    description="AI evaluation system powered by Microsoft Phi-2 model",
+    title="AI Judges Panel - GPT-2",
+    description="AI evaluation system powered by OpenAI GPT-2 model",
     version="2.0.0"
 )
 
@@ -39,29 +39,31 @@ templates = Jinja2Templates(directory="app/templates")
 # Include API routes
 app.include_router(evaluation_router, prefix="/api/v1", tags=["evaluation"])
 
-# Global Phi-2 judge instance
-phi2_judge = None
+# Global GPT-2 judge instance
+gpt2_judge = None
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize the Phi-2 judge on startup"""
-    global phi2_judge
-    logger.info("🏛️ Initializing Phi-2 AI Judge...")
+    """Initialize the GPT-2 judge on startup"""
+    global gpt2_judge
+    logger.info("🏛️ Initializing GPT-2 AI Judge...")
     try:
-        phi2_judge = get_phi2_judge()
-        logger.info("✅ Phi-2 AI Judge initialized successfully!")
+        # Don't load model immediately - use lazy loading
+        from .models.phi2_judge import get_phi2_judge
+        gpt2_judge = get_phi2_judge()  # Uses backward compatibility alias
+        logger.info("✅ GPT-2 AI Judge initialized successfully!")
     except Exception as e:
-        logger.error(f"❌ Failed to initialize Phi-2 judge: {e}")
+        logger.error(f"❌ Failed to initialize GPT-2 judge: {e}")
         # Don't raise here - model will be loaded on first use
         pass
 
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
-    global phi2_judge
-    if phi2_judge:
-        logger.info("🧹 Cleaning up Phi-2 judge...")
-        phi2_judge.unload_model()
+    global gpt2_judge
+    if gpt2_judge:
+        logger.info("🧹 Cleaning up GPT-2 judge...")
+        gpt2_judge.unload_model()
 
 # Pydantic models for API
 class EvaluationRequest(BaseModel):
@@ -97,41 +99,47 @@ async def about_page(request: Request):
 @app.get("/health")
 async def health_check():
     """Health check endpoint for Railway"""
-    global phi2_judge
+    global gpt2_judge
     
-    # Basic health status
+    # Basic health status - always return healthy for deployment
     status = {
         "status": "healthy",
         "timestamp": time.time(),
         "model_ready": False,
-        "model_name": "microsoft/phi-2"
+        "model_name": "openai-community/gpt2",
+        "service": "AI Judges Panel"
     }
     
     try:
-        if phi2_judge is not None:
-            model_info = phi2_judge.get_model_info()
+        if gpt2_judge is not None:
+            model_info = gpt2_judge.get_model_info()
             status["model_ready"] = model_info["model_loaded"]
             status["device"] = model_info["device"]
             status["available_aspects"] = model_info["available_aspects"]
+        else:
+            # Service is healthy even without model loaded (lazy loading)
+            status["model_ready"] = False
+            status["note"] = "Model will be loaded on first evaluation request"
     except Exception as e:
         logger.warning(f"Health check warning: {e}")
         status["warning"] = str(e)
+        # Still return healthy status for deployment
     
-    # Return 200 even if model not loaded (for Railway health check)
     return status
 
 # API endpoints (legacy support - redirects to new API)
 @app.post("/api/v1/evaluate", response_model=EvaluationResponse)
 async def evaluate_text(request: EvaluationRequest):
-    """Evaluate text using Phi-2 model (legacy endpoint)"""
-    global phi2_judge
+    """Evaluate text using GPT-2 model (legacy endpoint)"""
+    global gpt2_judge
     
-    if not phi2_judge:
-        phi2_judge = get_phi2_judge()
+    if not gpt2_judge:
+        from .models.phi2_judge import get_phi2_judge
+        gpt2_judge = get_phi2_judge()
     
     try:
         # Perform evaluation
-        result = phi2_judge.evaluate(
+        result = gpt2_judge.evaluate(
             prompt=request.prompt,
             response=request.response,
             weights=request.custom_weights
@@ -153,13 +161,14 @@ async def evaluate_text(request: EvaluationRequest):
 
 @app.get("/api/v1/model")
 async def get_model_info():
-    """Get information about the Phi-2 model"""
-    global phi2_judge
+    """Get information about the GPT-2 model"""
+    global gpt2_judge
     
-    if not phi2_judge:
-        phi2_judge = get_phi2_judge()
+    if not gpt2_judge:
+        from .models.phi2_judge import get_phi2_judge
+        gpt2_judge = get_phi2_judge()
     
-    return phi2_judge.get_model_info()
+    return gpt2_judge.get_model_info()
 
 # Error handlers
 @app.exception_handler(404)

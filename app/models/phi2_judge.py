@@ -1,6 +1,6 @@
 """
-Phi-2 Based AI Judge Implementation
-Single, efficient LLM judge using Microsoft Phi-2 model for evaluation tasks.
+GPT-2 Based AI Judge Implementation
+Single, efficient LLM judge using OpenAI GPT-2 model for evaluation tasks.
 """
 
 import torch
@@ -14,35 +14,34 @@ import gc
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class Phi2Judge:
+class GPT2Judge:
     """
-    Single AI judge using Microsoft Phi-2 model for comprehensive evaluation.
+    Single AI judge using OpenAI GPT-2 model for comprehensive evaluation.
     Optimized for resource efficiency and performance.
     """
     
     def __init__(self):
         self.model = None
         self.tokenizer = None
-        self.model_name = "microsoft/phi-2"
+        self.model_name = "openai-community/gpt2"
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.max_length = 100  # Short responses for efficiency
+        self.max_length = 150  # Short responses for efficiency
         self.model_loaded = False
         
-        logger.info(f"Phi2Judge initialized - Device: {self.device}")
+        logger.info(f"GPT2Judge initialized - Device: {self.device}")
     
     def _load_model(self):
-        """Load the Phi-2 model and tokenizer (lazy loading)"""
+        """Load the GPT-2 model and tokenizer (lazy loading)"""
         if self.model_loaded:
             return
             
         try:
-            logger.info(f"Loading Phi-2 model from {self.model_name}")
+            logger.info(f"Loading GPT-2 model from {self.model_name}")
             start_time = time.time()
             
             # Load tokenizer
             self.tokenizer = AutoTokenizer.from_pretrained(
-                self.model_name,
-                trust_remote_code=True
+                self.model_name
             )
             
             # Add padding token if not present
@@ -52,9 +51,7 @@ class Phi2Judge:
             # Load model with optimizations
             self.model = AutoModelForCausalLM.from_pretrained(
                 self.model_name,
-                trust_remote_code=True,
                 torch_dtype=torch.float16 if self.device == "cuda" else torch.float32,
-                device_map="auto" if self.device == "cuda" else None
             )
             
             if self.device == "cpu":
@@ -64,44 +61,51 @@ class Phi2Judge:
             self.model.eval()
             
             load_time = time.time() - start_time
-            logger.info(f"Model loaded successfully in {load_time:.2f} seconds")
+            logger.info(f"GPT-2 model loaded successfully in {load_time:.2f} seconds")
             self.model_loaded = True
             
         except Exception as e:
-            logger.error(f"Failed to load Phi-2 model: {e}")
+            logger.error(f"Failed to load GPT-2 model: {e}")
             raise RuntimeError(f"Model loading failed: {e}")
     
     def _generate_evaluation(self, prompt: str, response: str, aspect: str) -> Dict[str, Any]:
-        """Generate evaluation for a specific aspect using Phi-2"""
+        """Generate evaluation for a specific aspect using GPT-2 as a conversational evaluator"""
         if not self.model_loaded:
-            self._load_model()
+            try:
+                self._load_model()
+            except Exception as e:
+                logger.error(f"Failed to load model for evaluation: {e}")
+                return {
+                    "score": None,
+                    "feedback": f"LLM evaluation is not working - Model loading failed: {str(e)}",
+                    "aspect": aspect,
+                    "error": True
+                }
         
-        # Create evaluation prompt
-        evaluation_prompt = f"""Evaluate the following response to a prompt on {aspect}. Provide a score from 1-10 and brief reasoning.
+        # Create a simple evaluation prompt that works better with GPT-2
+        evaluation_prompt = f"""Question: {prompt[:150]}
+Answer: {response[:200]}
 
-Prompt: {prompt[:200]}...
-Response: {response[:200]}...
-
-Evaluation for {aspect.upper()}:
-Score (1-10):"""
+Rate the {aspect} of this answer from 1 to 10:
+Score: """
 
         try:
-            # Tokenize input
+            # Tokenize input with simple parameters
             inputs = self.tokenizer(
                 evaluation_prompt,
                 return_tensors="pt",
                 truncation=True,
-                max_length=512,
+                max_length=400,  # Shorter context
                 padding=True
             ).to(self.device)
             
-            # Generate response
+            # Generate response with simple, deterministic parameters
             with torch.no_grad():
                 outputs = self.model.generate(
                     **inputs,
-                    max_new_tokens=self.max_length,
+                    max_new_tokens=20,  # Very short - just need a number
                     do_sample=False,  # Deterministic
-                    temperature=0.1,
+                    temperature=1.0,
                     pad_token_id=self.tokenizer.pad_token_id,
                     eos_token_id=self.tokenizer.eos_token_id,
                     early_stopping=True
@@ -113,67 +117,94 @@ Score (1-10):"""
                 skip_special_tokens=True
             ).strip()
             
+            logger.info(f"GPT-2 raw response for {aspect}: {generated_text[:100]}...")
+            
             # Extract score and feedback
-            score, feedback = self._parse_evaluation_response(generated_text)
+            score, feedback = self._parse_evaluation_response(generated_text, aspect)
+            
+            if score is None:
+                return {
+                    "score": None,
+                    "feedback": f"LLM evaluation is not working - Could not parse response: {generated_text[:100]}...",
+                    "aspect": aspect,
+                    "error": True
+                }
             
             return {
                 "score": score,
                 "feedback": feedback,
-                "aspect": aspect
+                "aspect": aspect,
+                "error": False,
+                "raw_response": generated_text[:200]
             }
             
         except Exception as e:
-            logger.error(f"Evaluation generation failed: {e}")
+            logger.error(f"Evaluation generation failed for {aspect}: {e}")
             return {
-                "score": 5.0,  # Default score
-                "feedback": f"Evaluation failed due to technical error: {str(e)[:100]}",
-                "aspect": aspect
+                "score": None,
+                "feedback": f"LLM evaluation is not working - Generation failed: {str(e)}",
+                "aspect": aspect,
+                "error": True
             }
     
-    def _parse_evaluation_response(self, response_text: str) -> tuple:
-        """Parse the model's response to extract score and feedback"""
+    def _parse_evaluation_response(self, response_text: str, aspect: str) -> tuple:
+        """Parse the model's conversational evaluation response"""
         try:
-            lines = response_text.split('\n')
-            score = 5.0  # default
-            feedback = "Generated evaluation response"
+            score = None
+            reasoning = ""
             
-            # Look for score in various formats
-            for line in lines:
-                line = line.strip().lower()
-                if any(keyword in line for keyword in ['score:', 'rating:', 'grade:']):
-                    # Extract numeric score
-                    words = line.split()
-                    for word in words:
-                        try:
-                            # Look for number patterns like "8", "8/10", "8.5"
-                            if '/' in word:
-                                score = float(word.split('/')[0])
-                            elif word.replace('.', '').isdigit():
-                                score = float(word)
-                                if score > 10:
-                                    score = score / 10  # Handle percentage
-                                break
-                        except ValueError:
-                            continue
-                    break
+            # Clean the response
+            response_text = response_text.strip()
             
-            # Clean feedback
-            feedback = response_text[:200].strip()
-            if not feedback:
-                feedback = f"Score: {score}/10"
+            # Look for any number in the response (simplified approach)
+            import re
             
-            # Ensure score is in valid range
-            score = max(1.0, min(10.0, score))
+            # First try to find numbers directly at start of response
+            first_word = response_text.strip().split()[0] if response_text.strip() else ""
+            if first_word.replace('.', '').isdigit():
+                try:
+                    score = float(first_word)
+                    if 1 <= score <= 10:
+                        pass  # Valid score
+                    elif 10 < score <= 100:  # Percentage
+                        score = score / 10
+                    else:
+                        score = None
+                except ValueError:
+                    score = None
+            else:
+                # Look for any number in the text
+                numbers = re.findall(r'\b(\d+(?:\.\d+)?)\b', response_text)
+                score = None
+                for num_str in numbers:
+                    try:
+                        potential_score = float(num_str)
+                        if 1 <= potential_score <= 10:
+                            score = potential_score
+                            break
+                        elif 10 < potential_score <= 100:  # Percentage
+                            score = potential_score / 10
+                            break
+                    except ValueError:
+                        continue
+            
+            # Final fallback - if still no score, return None to indicate failure
+            if score is None:
+                logger.warning(f"Could not extract score from response: {response_text[:100]}...")
+                return None, f"Failed to parse {aspect} evaluation from: {response_text[:100]}..."
+            
+            # Simple feedback
+            feedback = f"LLM Score: {score}/10 for {aspect}. Generated: {response_text[:50]}..."
             
             return score, feedback
             
         except Exception as e:
-            logger.warning(f"Failed to parse evaluation response: {e}")
-            return 5.0, f"Parsing error: {str(e)[:50]}"
+            logger.error(f"Failed to parse evaluation response for {aspect}: {e}")
+            return None, f"Parsing failed: {str(e)[:50]}"
     
     def evaluate(self, prompt: str, response: str, weights: Optional[Dict[str, float]] = None) -> Dict[str, Any]:
         """
-        Comprehensive evaluation using Phi-2 model
+        Comprehensive evaluation using GPT-2 model
         
         Args:
             prompt: Input prompt to evaluate against
@@ -198,17 +229,47 @@ Score (1-10):"""
         
         start_time = time.time()
         evaluations = {}
+        failed_aspects = []
         
         # Evaluate each aspect
         for aspect in weights.keys():
             logger.info(f"Evaluating {aspect}...")
             evaluation = self._generate_evaluation(prompt, response, aspect)
             evaluations[aspect] = evaluation
+            
+            # Track failed evaluations
+            if evaluation.get("error", False) or evaluation.get("score") is None:
+                failed_aspects.append(aspect)
         
-        # Calculate weighted overall score
+        # If any evaluation failed, return error result
+        if failed_aspects:
+            eval_time = time.time() - start_time
+            error_msg = f"LLM evaluation is not working - Failed aspects: {', '.join(failed_aspects)}"
+            
+            return {
+                "overall_score": None,
+                "detailed_scores": {aspect: None for aspect in weights.keys()},
+                "detailed_feedback": {aspect: evaluations[aspect]["feedback"] for aspect in weights.keys()},
+                "weights_used": weights,
+                "evaluation_time": round(eval_time, 2),
+                "model_info": {
+                    "name": self.model_name,
+                    "device": self.device,
+                    "aspects_evaluated": list(weights.keys())
+                },
+                "input_info": {
+                    "prompt_length": len(prompt),
+                    "response_length": len(response)
+                },
+                "error": True,
+                "error_message": error_msg
+            }
+        
+        # Calculate weighted overall score (only if all evaluations succeeded)
         overall_score = sum(
             evaluations[aspect]["score"] * weights[aspect] 
             for aspect in weights.keys()
+            if evaluations[aspect]["score"] is not None
         )
         
         # Calculate evaluation time
@@ -232,7 +293,9 @@ Score (1-10):"""
             "input_info": {
                 "prompt_length": len(prompt),
                 "response_length": len(response)
-            }
+            },
+            "error": False,
+            "raw_responses": {aspect: evaluations[aspect].get("raw_response", "") for aspect in weights.keys()}
         }
         
         logger.info(f"Evaluation completed in {eval_time:.2f}s - Overall score: {overall_score:.2f}")
@@ -271,10 +334,20 @@ Score (1-10):"""
         eval2 = self.evaluate(prompt, response2)
         
         # Determine winner
-        score1 = eval1["overall_score"]
-        score2 = eval2["overall_score"]
+        score1 = eval1.get("overall_score")
+        score2 = eval2.get("overall_score")
         
-        if score1 > score2:
+        # Handle None scores
+        if score1 is None or score2 is None:
+            winner = "error"
+            margin = 0
+            if score1 is None and score2 is None:
+                winner = "both_failed"
+            elif score1 is None:
+                winner = "response1_failed"
+            else:
+                winner = "response2_failed"
+        elif score1 > score2:
             winner = "response1"
             margin = score1 - score2
         elif score2 > score1:
@@ -286,13 +359,13 @@ Score (1-10):"""
         
         return {
             "winner": winner,
-            "margin": round(margin, 2),
+            "margin": round(margin, 2) if margin is not None else 0,
             "response1_evaluation": eval1,
             "response2_evaluation": eval2,
             "comparison_summary": {
                 "response1_score": score1,
                 "response2_score": score2,
-                "difference": round(margin, 2)
+                "difference": round(margin, 2) if margin is not None else 0
             }
         }
     
@@ -304,8 +377,8 @@ Score (1-10):"""
             "device": self.device,
             "max_length": self.max_length,
             "available_aspects": ["relevance", "coherence", "accuracy", "completeness"],
-            "model_parameters": "2.7B",
-            "model_description": "Microsoft Phi-2 - Efficient transformer model for text generation and evaluation"
+            "model_parameters": "124M",
+            "model_description": "OpenAI GPT-2 - Lightweight transformer model for text generation and evaluation"
         }
     
     def unload_model(self):
@@ -325,11 +398,15 @@ Score (1-10):"""
 
 
 # Singleton instance for efficient resource usage
-_phi2_judge_instance = None
+_gpt2_judge_instance = None
 
-def get_phi2_judge() -> Phi2Judge:
-    """Get singleton instance of Phi2Judge"""
-    global _phi2_judge_instance
-    if _phi2_judge_instance is None:
-        _phi2_judge_instance = Phi2Judge()
-    return _phi2_judge_instance
+def get_gpt2_judge() -> GPT2Judge:
+    """Get singleton instance of GPT2Judge"""
+    global _gpt2_judge_instance
+    if _gpt2_judge_instance is None:
+        _gpt2_judge_instance = GPT2Judge()
+    return _gpt2_judge_instance
+
+# Keep backward compatibility
+get_phi2_judge = get_gpt2_judge
+Phi2Judge = GPT2Judge

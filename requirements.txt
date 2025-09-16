@@ -1,5 +1,5 @@
-# AI Judges Panel - Phi-2 Requirements
-# ====================================
+# AI Judges Panel - GPT-2 Requirements
+# ===================================
 
 # FastAPI Web Framework
 fastapi>=0.104.0
@@ -7,31 +7,10 @@ uvicorn[standard]>=0.24.0
 jinja2>=3.1.0
 python-multipart>=0.0.6
 
-# Core dependencies
-pandas>=1.5.0
-numpy>=1.21.0
-matplotlib>=3.5.0
-seaborn>=0.11.0
-
-# Jupyter notebook support (optional for development)
-jupyter>=1.0.0
-ipywidgets>=7.6.0
-
-# Phi-2 Model Requirements
-torch>=2.0.0
-transformers>=4.35.0
-accelerate>=0.25.0  # For model optimization
+# GPT-2 Model Requirements (lightweight)
+torch>=1.12.0
+transformers>=4.21.0
 
 # Essential utilities
 typing-extensions>=4.3.0
 pydantic>=2.0.0
-python-dotenv>=0.19.0
-
-# Development dependencies (optional)
-# jupyter>=1.0.0
-# ipywidgets>=7.6.0
-# matplotlib>=3.5.0
-# seaborn>=0.11.0
-# pandas>=1.5.0
-# pytest>=7.0.0
-# black>=22.0.0

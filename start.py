@@ -17,8 +17,9 @@ def main():
     # Get port from Railway
     port = int(os.environ.get("PORT", 8000))
     
-    print(f"🚀 Starting AI Judges Panel on port {port}")
+    print(f"🚀 Starting AI Judges Panel (GPT-2) on port {port}")
     print(f"📍 Environment: {os.environ.get('ENVIRONMENT', 'development')}")
+    print(f"🤖 Model: OpenAI GPT-2 (124M parameters)")
     
     # Start with uvicorn
     uvicorn.run(

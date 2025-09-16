@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Test script for Phi-2 AI Judge
-Verifies that the Phi-2 model implementation works correctly.
+Test script for LLM AI Judge
+Verifies that the LLM-based judge implementation works correctly.
 """
 
 import sys
@@ -11,13 +11,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
 from models.phi2_judge import get_phi2_judge
 import time
 
-def test_phi2_judge():
-    """Test the Phi-2 judge functionality"""
-    print("🧪 Testing Phi-2 AI Judge Implementation")
+def test_llm_judge():
+    """Test the LLM judge functionality"""
+    print("🧪 Testing LLM AI Judge Implementation")
     print("=" * 50)
     
     # Get the judge instance
-    print("📥 Initializing Phi-2 judge...")
+    print("📥 Initializing LLM judge...")
     judge = get_phi2_judge()
     
     # Check model info
@@ -49,6 +49,14 @@ def test_phi2_judge():
         result = judge.evaluate(test_prompt, test_response)
         eval_time = time.time() - start_time
         
+        # Check if evaluation worked
+        if result.get('error', False):
+            print(f"❌ {result.get('error_message', 'Unknown error')}")
+            print("\n💬 Error Details:")
+            for aspect, feedback in result['detailed_feedback'].items():
+                print(f"  {aspect.capitalize()}: {feedback[:80]}...")
+            return False
+        
         print("✅ Evaluation Results:")
         print(f"  Overall Score: {result['overall_score']}/10")
         print(f"  Evaluation Time: {eval_time:.2f}s (reported: {result['evaluation_time']:.2f}s)")
@@ -61,7 +69,15 @@ def test_phi2_judge():
         
         print("💬 Detailed Feedback:")
         for aspect, feedback in result['detailed_feedback'].items():
-            print(f"  {aspect.capitalize()}: {feedback[:80]}...")
+            print(f"  {aspect.capitalize()}: {feedback[:100]}...")
+        print()
+        
+        # Show raw LLM responses for debugging
+        if 'raw_responses' in result:
+            print("🔍 Raw LLM Responses:")
+            for aspect, raw in result['raw_responses'].items():
+                if raw:
+                    print(f"  {aspect.capitalize()}: {raw[:80]}...")
         print()
         
         print("⚖️ Weights Used:")
@@ -128,14 +144,14 @@ def test_comparison():
 
 def main():
     """Run all tests"""
-    print("🚀 Starting Phi-2 AI Judge Tests")
+    print("🚀 Starting LLM AI Judge Tests")
     print("=" * 60)
     
     tests_passed = 0
     total_tests = 3
     
     # Test basic evaluation
-    if test_phi2_judge():
+    if test_llm_judge():
         tests_passed += 1
         print("✅ Basic evaluation test passed")
     else:
@@ -163,7 +179,7 @@ def main():
     print(f"🎯 Tests Summary: {tests_passed}/{total_tests} passed")
     
     if tests_passed == total_tests:
-        print("🎉 All tests passed! Phi-2 judge is working correctly.")
+        print("🎉 All tests passed! LLM judge is working correctly.")
         return True
     else:
         print("⚠️ Some tests failed. Check the implementation.")
