@@ -1,5 +1,5 @@
-# AI Judges Panel - Requirements
-# ================================
+# AI Judges Panel - Phi-2 Requirements
+# ====================================
 
 # FastAPI Web Framework
 fastapi>=0.104.0
@@ -17,48 +17,21 @@ seaborn>=0.11.0
 jupyter>=1.0.0
 ipywidgets>=7.6.0
 
-# NLP and Hugging Face (simplified for faster deployment)
-# torch>=2.0.0  # Optional: only if needed
+# Phi-2 Model Requirements
+torch>=2.0.0
 transformers>=4.35.0
-sentence-transformers>=2.2.0
-# tokenizers>=0.15.0  # Included with transformers
-nltk>=3.7
-rouge-score>=0.1.2
-textstat>=0.7.3
+accelerate>=0.25.0  # For model optimization
 
-# Machine Learning
-scikit-learn>=1.3.0
-scipy>=1.9.0
-
-# Optional: For advanced metrics
-# bert-score>=0.3.13
-# evaluate>=0.4.0
-
-# Optional: For real LLM integration
-# openai>=1.0.0
-# anthropic>=0.3.0
-
-# Development and testing
-pytest>=7.0.0
-black>=22.0.0
-
-# Data structures and utilities
-dataclasses-json>=0.5.7
+# Essential utilities
 typing-extensions>=4.3.0
 pydantic>=2.0.0
-
-# Development environment
 python-dotenv>=0.19.0
 
-# HTTP client for health checks
-httpx>=0.25.0
-
-# Async utilities
-aiofiles>=23.0.0
-
-# Optional: For visualizations (keep commented for production)
-# plotly>=5.10.0
-# dash>=2.6.0
-
-# Optional: For database storage
-# sqlalchemy>=1.4.0
+# Development dependencies (optional)
+# jupyter>=1.0.0
+# ipywidgets>=7.6.0
+# matplotlib>=3.5.0
+# seaborn>=0.11.0
+# pandas>=1.5.0
+# pytest>=7.0.0
+# black>=22.0.0

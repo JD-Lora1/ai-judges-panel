@@ -3,8 +3,7 @@
 // Global variables
 let isEvaluating = false;
 let currentEvaluation = null;
-let availableModels = [];
-let currentModelType = 'hf';
+let modelInfo = null;
 
 // DOM elements
 const evaluationForm = document.getElementById('evaluation-form');
@@ -26,8 +25,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Check system status
     checkSystemStatus();
     
-    // Load available models
-    loadAvailableModels();
+    // Load model info
+    loadModelInfo();
+    
+    // Initialize weight controls if present
+    initializeWeightControls();
 });
 
 // Initialize evaluation form
@@ -52,10 +54,7 @@ async function handleEvaluationSubmit(event) {
     const evaluationData = {
         prompt: formData.get('prompt'),
         response: formData.get('response'),
-        domain: formData.get('domain') || null,
-        include_automatic_metrics: formData.get('include_automatic_metrics') === 'on',
-        model_type: formData.get('model_type') || 'hf',
-        llm_model: formData.get('llm_model') || 'distilgpt2'
+        custom_weights: getCustomWeights()
     };
     
     // Validate input
@@ -64,13 +63,13 @@ async function handleEvaluationSubmit(event) {
         return;
     }
     
-    if (evaluationData.prompt.length < 10) {
-        showAlert('warning', 'El prompt debe tener al menos 10 caracteres.');
+    if (evaluationData.prompt.length < 1) {
+        showAlert('warning', 'El prompt no puede estar vacío.');
         return;
     }
     
-    if (evaluationData.response.length < 10) {
-        showAlert('warning', 'La respuesta debe tener al menos 10 caracteres.');
+    if (evaluationData.response.length < 1) {
+        showAlert('warning', 'La respuesta no puede estar vacía.');
         return;
     }
     
@@ -85,7 +84,7 @@ async function performEvaluation(data) {
     hideResults();
     
     try {
-        const response = await fetch('/api/v1/evaluate/detailed', {
+        const response = await fetch('/api/v1/evaluate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -119,23 +118,27 @@ async function performEvaluation(data) {
 function displayResults(evaluation) {
     if (!resultsContainer) return;
     
-    const finalScore = evaluation.final_score;
-    const scoreClass = getScoreClass(finalScore);
+    const overallScore = evaluation.overall_score;
+    const scoreClass = getScoreClass(overallScore);
     
     resultsContainer.innerHTML = `
         <div class="results-header text-center mb-4">
-            <h3><i class="fas fa-chart-line me-2"></i>Resultados de la Evaluación</h3>
+            <h3><i class="fas fa-chart-line me-2"></i>Resultados de la Evaluación Phi-2</h3>
             <div class="score-display ${scoreClass}">
-                ${finalScore.toFixed(1)}/10
+                ${overallScore.toFixed(1)}/10
             </div>
             <div class="consensus-info">
                 <span class="badge bg-info">
-                    <i class="fas fa-handshake me-1"></i>
-                    Consenso: ${(evaluation.consensus_level * 100).toFixed(0)}%
+                    <i class="fas fa-robot me-1"></i>
+                    Phi-2 Model
                 </span>
                 <span class="badge bg-secondary ms-2">
                     <i class="fas fa-clock me-1"></i>
                     ${evaluation.evaluation_time.toFixed(2)}s
+                </span>
+                <span class="badge bg-success ms-2">
+                    <i class="fas fa-microchip me-1"></i>
+                    ${evaluation.model_info.device}
                 </span>
             </div>
         </div>
@@ -144,37 +147,35 @@ function displayResults(evaluation) {
             <div class="col-md-6 mb-4">
                 <h5><i class="fas fa-chart-bar me-2"></i>Scores por Aspecto</h5>
                 <div class="aspect-scores">
-                    ${generateAspectScores(evaluation.individual_scores)}
+                    ${generateAspectScores(evaluation.detailed_scores)}
                 </div>
             </div>
             
             <div class="col-md-6 mb-4">
-                <h5><i class="fas fa-star me-2"></i>Fortalezas</h5>
-                <ul class="feedback-list strengths">
-                    ${evaluation.strengths.slice(0, 5).map(strength => 
-                        `<li>${strength}</li>`
-                    ).join('')}
-                </ul>
+                <h5><i class="fas fa-comment-alt me-2"></i>Retroalimentación Detallada</h5>
+                <div class="detailed-feedback">
+                    ${generateDetailedFeedback(evaluation.detailed_feedback)}
+                </div>
             </div>
         </div>
         
         <div class="row">
             <div class="col-md-6 mb-4">
-                <h5><i class="fas fa-arrow-up me-2"></i>Áreas de Mejora</h5>
-                <ul class="feedback-list improvements">
-                    ${evaluation.improvements.slice(0, 5).map(improvement => 
-                        `<li>${improvement}</li>`
-                    ).join('')}
-                </ul>
+                <h5><i class="fas fa-balance-scale me-2"></i>Pesos Utilizados</h5>
+                <div class="weights-info">
+                    ${generateWeightsDisplay(evaluation.weights_used)}
+                </div>
             </div>
             
             <div class="col-md-6 mb-4">
-                <h5><i class="fas fa-info-circle me-2"></i>Metadatos</h5>
-                <div class="metadata-info">
+                <h5><i class="fas fa-info-circle me-2"></i>Información del Modelo</h5>
+                <div class="model-info">
                     <small class="text-muted">
-                        <strong>Tipo:</strong> ${evaluation.metadata.model_type || 'hf'}<br>
-                        ${evaluation.metadata.model_used ? `<strong>Modelo:</strong> ${evaluation.metadata.model_used}<br>` : ''}
-                        ${evaluation.metadata.domain ? `<strong>Dominio:</strong> ${evaluation.metadata.domain}<br>` : ''}
+                        <strong>Modelo:</strong> ${evaluation.model_info.name}<br>
+                        <strong>Parámetros:</strong> ${evaluation.model_info.model_parameters}<br>
+                        <strong>Dispositivo:</strong> ${evaluation.model_info.device}<br>
+                        <strong>Prompt:</strong> ${evaluation.input_info.prompt_length} chars<br>
+                        <strong>Respuesta:</strong> ${evaluation.input_info.response_length} chars<br>
                         <strong>Timestamp:</strong> ${new Date(evaluation.timestamp).toLocaleString()}
                     </small>
                 </div>
@@ -209,7 +210,7 @@ function displayResults(evaluation) {
     resultsContainer.classList.add('fade-in');
     
     // Create scores chart
-    createScoresChart(evaluation.individual_scores);
+    createScoresChart(evaluation.detailed_scores);
     
     // Scroll to results
     resultsContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -509,27 +510,128 @@ function generateDetailedFeedback(detailedFeedback) {
         <div class="card mb-3">
             <div class="card-header">
                 <strong>${aspect.charAt(0).toUpperCase() + aspect.slice(1)}</strong>
-                <span class="badge bg-primary ms-2">${feedback.score}/10</span>
             </div>
             <div class="card-body">
-                <p><strong>Razonamiento:</strong> ${feedback.reasoning}</p>
-                <div class="row">
-                    <div class="col-md-6">
-                        <h6>Fortalezas:</h6>
-                        <ul class="small">
-                            ${feedback.strengths.map(s => `<li>${s}</li>`).join('')}
-                        </ul>
-                    </div>
-                    <div class="col-md-6">
-                        <h6>Mejoras:</h6>
-                        <ul class="small">
-                            ${feedback.improvements.map(i => `<li>${i}</li>`).join('')}
-                        </ul>
-                    </div>
-                </div>
+                <p>${feedback}</p>
             </div>
         </div>
     `).join('');
+}
+
+// Load model information
+async function loadModelInfo() {
+    try {
+        const response = await fetch('/api/v1/models/info');
+        if (response.ok) {
+            modelInfo = await response.json();
+            updateModelDisplay();
+        }
+    } catch (error) {
+        console.warn('Could not load model info:', error);
+    }
+}
+
+// Update model display
+function updateModelDisplay() {
+    const modelElements = document.querySelectorAll('[data-model-info]');
+    modelElements.forEach(element => {
+        const infoType = element.dataset.modelInfo;
+        if (modelInfo && modelInfo.model_info) {
+            switch(infoType) {
+                case 'name':
+                    element.textContent = modelInfo.model_info.model_name;
+                    break;
+                case 'device':
+                    element.textContent = modelInfo.model_info.device;
+                    break;
+                case 'status':
+                    element.textContent = modelInfo.status;
+                    break;
+            }
+        }
+    });
+}
+
+// Get custom weights from form
+function getCustomWeights() {
+    const weightInputs = document.querySelectorAll('[data-aspect-weight]');
+    if (weightInputs.length === 0) return null;
+    
+    const weights = {};
+    weightInputs.forEach(input => {
+        const aspect = input.dataset.aspectWeight;
+        const value = parseFloat(input.value);
+        if (!isNaN(value)) {
+            weights[aspect] = value;
+        }
+    });
+    
+    return Object.keys(weights).length > 0 ? weights : null;
+}
+
+// Initialize weight controls
+function initializeWeightControls() {
+    const weightContainer = document.getElementById('weight-controls');
+    if (!weightContainer) return;
+    
+    // Create weight sliders for each aspect
+    const aspects = ['relevance', 'coherence', 'accuracy', 'completeness'];
+    const defaultWeights = [0.3, 0.25, 0.25, 0.2];
+    
+    weightContainer.innerHTML = aspects.map((aspect, index) => `
+        <div class="mb-3">
+            <label for="weight-${aspect}" class="form-label">
+                ${aspect.charAt(0).toUpperCase() + aspect.slice(1)}
+                <span class="badge bg-secondary" id="weight-${aspect}-display">${defaultWeights[index]}</span>
+            </label>
+            <input type="range" class="form-range" 
+                   id="weight-${aspect}" 
+                   data-aspect-weight="${aspect}"
+                   min="0" max="1" step="0.05" value="${defaultWeights[index]}">
+        </div>
+    `).join('');
+    
+    // Add event listeners for real-time updates
+    aspects.forEach(aspect => {
+        const slider = document.getElementById(`weight-${aspect}`);
+        const display = document.getElementById(`weight-${aspect}-display`);
+        
+        slider.addEventListener('input', function() {
+            display.textContent = this.value;
+        });
+    });
+}
+
+// Generate weights display
+function generateWeightsDisplay(weights) {
+    return Object.entries(weights).map(([aspect, weight]) => {
+        const percentage = (weight * 100).toFixed(1);
+        return `
+            <div class="d-flex justify-content-between mb-2">
+                <span>${aspect.charAt(0).toUpperCase() + aspect.slice(1)}:</span>
+                <span class="badge bg-primary">${percentage}%</span>
+            </div>
+        `;
+    }).join('');
+}
+
+// Update share results for Phi-2
+function shareResults() {
+    if (!currentEvaluation) return;
+    
+    const shareText = `AI Judges Panel (Phi-2) - Score: ${currentEvaluation.overall_score.toFixed(1)}/10`;
+    
+    if (navigator.share) {
+        navigator.share({
+            title: 'Evaluación AI Judges Panel - Phi-2',
+            text: shareText,
+            url: window.location.href
+        });
+    } else {
+        navigator.clipboard.writeText(shareText + ' - ' + window.location.href)
+            .then(() => showAlert('success', 'Enlace copiado al portapapeles'))
+            .catch(() => showAlert('error', 'No se pudo copiar al portapapeles'));
+    }
 }
 
 // Export functions for use in other scripts
@@ -538,5 +640,7 @@ window.AIJudgesPanel = {
     showAlert,
     downloadResults,
     shareResults,
-    showDetailedAnalysis
+    showDetailedAnalysis,
+    loadModelInfo,
+    getCustomWeights
 };

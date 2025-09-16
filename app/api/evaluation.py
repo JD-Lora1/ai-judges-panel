@@ -2,7 +2,7 @@
 API Routes for Evaluation
 =========================
 
-FastAPI routes for handling evaluation requests and responses.
+FastAPI routes for handling evaluation requests using Phi-2 model.
 """
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
@@ -20,16 +20,12 @@ router = APIRouter()
 # In-memory storage for evaluation results (in production, use Redis or database)
 evaluation_cache = {}
 
-class DetailedEvaluationRequest(BaseModel):
-    """Extended evaluation request with additional options"""
-    prompt: str = Field(..., min_length=10, max_length=2000, description="The prompt to evaluate against")
-    response: str = Field(..., min_length=10, max_length=5000, description="The response to evaluate")
-    domain: Optional[str] = Field(None, description="Domain for specialized evaluation")
-    custom_weights: Optional[Dict[str, float]] = Field(None, description="Custom weights for judges")
-    include_automatic_metrics: bool = Field(True, description="Include automatic metrics")
+class EvaluationRequest(BaseModel):
+    """Evaluation request using Phi-2 model"""
+    prompt: str = Field(..., min_length=1, max_length=2000, description="The prompt to evaluate against")
+    response: str = Field(..., min_length=1, max_length=5000, description="The response to evaluate")
+    custom_weights: Optional[Dict[str, float]] = Field(None, description="Custom weights for evaluation aspects")
     evaluation_id: Optional[str] = Field(None, description="Custom evaluation ID")
-    model_type: str = Field("hf", description="Model type: 'hf' for HuggingFace judges, 'llm' for LLM judges")
-    llm_model: Optional[str] = Field("distilgpt2", description="Specific LLM model for evaluation")
 
 class EvaluationStatus(BaseModel):
     """Status of an ongoing evaluation"""
@@ -43,18 +39,14 @@ class EvaluationStatus(BaseModel):
 
 class BatchEvaluationRequest(BaseModel):
     """Request for batch evaluation"""
-    evaluations: List[DetailedEvaluationRequest]
+    evaluations: List[EvaluationRequest]
     batch_name: Optional[str] = Field(None, description="Name for this batch")
-    model_type: str = Field("hf", description="Default model type for batch")
-    llm_model: Optional[str] = Field("distilgpt2", description="Default LLM model for batch")
 
 class ComparisonRequest(BaseModel):
     """Request to compare multiple responses"""
     prompt: str
     responses: Dict[str, str]  # name: response
-    domain: Optional[str] = None
-    model_type: str = Field("hf", description="Model type for evaluation")
-    llm_model: Optional[str] = Field("distilgpt2", description="LLM model for evaluation")
+    custom_weights: Optional[Dict[str, float]] = Field(None, description="Custom weights for comparison")
 
 @router.get("/status")
 async def get_api_status():
@@ -66,41 +58,35 @@ async def get_api_status():
         "timestamp": datetime.now().isoformat()
     }
 
-@router.get("/models/available")
-async def get_available_models():
-    """Get list of available LLM models for evaluation"""
+@router.get("/models/info")
+async def get_model_info():
+    """Get information about the Phi-2 model"""
     try:
-        from ..models.contextual_judges import ContextualJudgesPanel
+        from ..models.phi2_judge import get_phi2_judge
         
-        models = ContextualJudgesPanel.get_available_models()
-        model_list = []
-        
-        for model_id, config in models.items():
-            model_list.append({
-                "id": model_id,
-                "name": config.name,
-                "description": config.description,
-                "max_length": config.max_length,
-                "temperature": config.temperature
-            })
+        judge = get_phi2_judge()
+        model_info = judge.get_model_info()
         
         return {
-            "available_models": model_list,
-            "default_model": "distilgpt2",
-            "model_types": {
-                "hf": "HuggingFace Judges (embeddings + heuristics)",
-                "llm": "LLM Judges (language model evaluation)"
+            "model_info": model_info,
+            "status": "active",
+            "supported_aspects": model_info["available_aspects"],
+            "default_weights": {
+                "relevance": 0.3,
+                "coherence": 0.25,
+                "accuracy": 0.25,
+                "completeness": 0.2
             }
         }
         
     except Exception as e:
-        logger.error(f"Failed to get available models: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get models: {str(e)}")
+        logger.error(f"Failed to get model info: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get model info: {str(e)}")
 
-@router.post("/evaluate/detailed", response_model=Dict[str, Any])
-async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks: BackgroundTasks):
+@router.post("/evaluate", response_model=Dict[str, Any])
+async def evaluate_with_phi2(request: EvaluationRequest):
     """
-    Perform detailed evaluation with custom options
+    Perform evaluation using Phi-2 model
     """
     try:
         # Generate evaluation ID
@@ -115,99 +101,30 @@ async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks
             updated_at=datetime.now()
         )
         
-        # Choose appropriate judges panel based on model_type
-        if request.model_type == "llm":
-            # Use Contextual judges (advanced contextual analysis)
-            from ..models.contextual_judges import ContextualJudgesPanel
-            
-            llm_panel = ContextualJudgesPanel(model_name=request.llm_model)
-            
-            # Use custom weights if provided, otherwise use defaults
-            weights = request.custom_weights or {
-                "precision": 0.35,
-                "coherence": 0.30,
-                "relevance": 0.20,
-                "efficiency": 0.10,
-                "creativity": 0.05
-            }
-            
-            # Perform LLM-based evaluation
-            llm_result = await llm_panel.evaluate_response_async(
-                prompt=request.prompt,
-                response=request.response,
-                weights=weights
-            )
-            
-            # Convert LLM result to standard format
-            result_dict = {
-                "evaluation_id": eval_id,
-                "final_score": llm_result["overall_score"],
-                "individual_scores": {
-                    "precision": llm_result["individual_scores"]["precision"]["score"],
-                    "coherence": llm_result["individual_scores"]["coherence"]["score"],
-                    "relevance": llm_result["individual_scores"]["relevance"]["score"],
-                    "efficiency": llm_result["individual_scores"]["efficiency"]["score"],
-                    "creativity": llm_result["individual_scores"]["creativity"]["score"]
-                },
-                "consensus_level": llm_result["consensus"],
-                "strengths": [
-                    llm_result["individual_scores"]["precision"]["feedback"],
-                    llm_result["individual_scores"]["coherence"]["feedback"],
-                    llm_result["individual_scores"]["relevance"]["feedback"]
-                ],
-                "improvements": [
-                    llm_result["individual_scores"]["efficiency"]["feedback"],
-                    llm_result["individual_scores"]["creativity"]["feedback"]
-                ],
-                "evaluation_time": 0.0,  # Will be calculated
-                "metadata": {
-                    "model_used": llm_result["model_used"],
-                    "model_type": "llm",
-                    "weights": llm_result["weights"],
-                    "evaluation_stats": llm_result["evaluation_stats"]
-                },
-                "timestamp": datetime.now().isoformat()
-            }
-            
-        else:
-            # Use original HuggingFace judges
-            from app.main import judges_panel
-            
-            if not judges_panel or not judges_panel.is_ready():
-                raise HTTPException(status_code=503, detail="Judges panel not ready")
-            
-            # Update weights if provided
-            original_weights = judges_panel.weights.copy()
-            if request.custom_weights:
-                judges_panel.weights.update(request.custom_weights)
-            
-            try:
-                # Perform evaluation
-                result = await judges_panel.evaluate(
-                    prompt=request.prompt,
-                    response=request.response,
-                    domain=request.domain,
-                    include_automatic_metrics=request.include_automatic_metrics
-                )
-            
-                # Convert to dict for JSON response
-                result_dict = {
-                    "evaluation_id": eval_id,
-                    "final_score": result.final_score,
-                    "individual_scores": result.individual_scores,
-                    "consensus_level": result.consensus_level,
-                    "strengths": result.strengths,
-                    "improvements": result.improvements,
-                    "evaluation_time": result.evaluation_time,
-                    "metadata": {**result.metadata, "model_type": "hf"},
-                    "timestamp": datetime.now().isoformat()
-                }
-            
-            finally:
-                # Restore original weights for HF judges
-                if request.model_type == "hf":
-                    judges_panel.weights = original_weights
-            
+        # Get Phi-2 judge
+        from ..models.phi2_judge import get_phi2_judge
+        judge = get_phi2_judge()
+        
+        # Perform evaluation
+        result = judge.evaluate(
+            prompt=request.prompt,
+            response=request.response,
+            weights=request.custom_weights
+        )
+        
+        # Convert to API response format
+        result_dict = {
+            "evaluation_id": eval_id,
+            "overall_score": result["overall_score"],
+            "detailed_scores": result["detailed_scores"],
+            "detailed_feedback": result["detailed_feedback"],
+            "weights_used": result["weights_used"],
+            "evaluation_time": result["evaluation_time"],
+            "model_info": result["model_info"],
+            "input_info": result["input_info"],
+            "timestamp": datetime.now().isoformat()
+        }
+        
         # Update cache
         evaluation_cache[eval_id].status = "completed"
         evaluation_cache[eval_id].progress = 1.0
@@ -217,10 +134,10 @@ async def detailed_evaluate(request: DetailedEvaluationRequest, background_tasks
         return result_dict
             
     except Exception as e:
-        logger.error(f"Detailed evaluation failed: {e}")
+        logger.error(f"Phi-2 evaluation failed: {e}")
         
         # Update cache with error
-        if eval_id in evaluation_cache:
+        if 'eval_id' in locals() and eval_id in evaluation_cache:
             evaluation_cache[eval_id].status = "failed"
             evaluation_cache[eval_id].error = str(e)
             evaluation_cache[eval_id].updated_at = datetime.now()
@@ -238,52 +155,46 @@ async def get_evaluation_status(evaluation_id: str):
 @router.post("/evaluate/batch")
 async def batch_evaluate(request: BatchEvaluationRequest):
     """
-    Perform batch evaluation of multiple texts
+    Perform batch evaluation using Phi-2 model
     """
     try:
         batch_id = str(uuid.uuid4())
+        
+        # Get Phi-2 judge
+        from ..models.phi2_judge import get_phi2_judge
+        judge = get_phi2_judge()
+        
+        # Prepare batch data
+        batch_data = []
+        for eval_request in request.evaluations:
+            batch_data.append({
+                "prompt": eval_request.prompt,
+                "response": eval_request.response,
+                "weights": eval_request.custom_weights
+            })
+        
+        # Perform batch evaluation
+        batch_results = judge.batch_evaluate(batch_data)
+        
+        # Format results
         results = []
-        
-        from app.main import judges_panel
-        
-        if not judges_panel or not judges_panel.is_ready():
-            raise HTTPException(status_code=503, detail="Judges panel not ready")
-        
-        # Process each evaluation in the batch
-        for i, eval_request in enumerate(request.evaluations):
-            try:
-                result = await judges_panel.evaluate(
-                    prompt=eval_request.prompt,
-                    response=eval_request.response,
-                    domain=eval_request.domain,
-                    include_automatic_metrics=eval_request.include_automatic_metrics
-                )
-                
-                results.append({
-                    "index": i,
-                    "evaluation_id": eval_request.evaluation_id or f"{batch_id}_{i}",
-                    "final_score": result.final_score,
-                    "individual_scores": result.individual_scores,
-                    "consensus_level": result.consensus_level,
-                    "evaluation_time": result.evaluation_time,
-                    "status": "completed"
-                })
-                
-            except Exception as e:
-                logger.error(f"Batch evaluation item {i} failed: {e}")
-                results.append({
-                    "index": i,
-                    "evaluation_id": eval_request.evaluation_id or f"{batch_id}_{i}",
-                    "status": "failed",
-                    "error": str(e)
-                })
+        for i, result in enumerate(batch_results):
+            eval_request = request.evaluations[i]
+            results.append({
+                "index": i,
+                "evaluation_id": eval_request.evaluation_id or f"{batch_id}_{i}",
+                "overall_score": result["overall_score"],
+                "detailed_scores": result["detailed_scores"],
+                "evaluation_time": result["evaluation_time"],
+                "status": "completed"
+            })
         
         return {
             "batch_id": batch_id,
             "batch_name": request.batch_name,
             "total_evaluations": len(request.evaluations),
-            "successful_evaluations": len([r for r in results if r["status"] == "completed"]),
-            "failed_evaluations": len([r for r in results if r["status"] == "failed"]),
+            "successful_evaluations": len(results),
+            "failed_evaluations": 0,
             "results": results,
             "timestamp": datetime.now().isoformat()
         }
@@ -295,87 +206,121 @@ async def batch_evaluate(request: BatchEvaluationRequest):
 @router.post("/evaluate/compare")
 async def compare_responses(request: ComparisonRequest):
     """
-    Compare multiple responses to the same prompt
+    Compare multiple responses using Phi-2 model
     """
     try:
-        from app.main import judges_panel
+        # Get Phi-2 judge
+        from ..models.phi2_judge import get_phi2_judge
+        judge = get_phi2_judge()
         
-        if not judges_panel or not judges_panel.is_ready():
-            raise HTTPException(status_code=503, detail="Judges panel not ready")
-        
-        results = {}
-        comparison_data = []
-        
-        # Evaluate each response
-        for name, response in request.responses.items():
-            try:
-                result = await judges_panel.evaluate(
-                    prompt=request.prompt,
-                    response=response,
-                    domain=request.domain,
-                    include_automatic_metrics=True
-                )
-                
-                results[name] = {
-                    "final_score": result.final_score,
-                    "individual_scores": result.individual_scores,
-                    "consensus_level": result.consensus_level,
-                    "strengths": result.strengths[:5],  # Top 5 strengths
-                    "improvements": result.improvements[:5],  # Top 5 improvements
-                    "evaluation_time": result.evaluation_time
-                }
-                
-                # Prepare data for comparison analysis
-                comparison_data.append({
-                    "name": name,
-                    "final_score": result.final_score,
-                    **result.individual_scores
-                })
-                
-            except Exception as e:
-                logger.error(f"Comparison evaluation for '{name}' failed: {e}")
-                results[name] = {
-                    "status": "failed",
-                    "error": str(e)
-                }
-        
-        # Generate comparison insights
-        successful_results = [r for r in results.values() if "final_score" in r]
-        
-        if successful_results:
-            best_response = max(request.responses.keys(), 
-                              key=lambda k: results[k].get("final_score", 0))
+        # Handle pair comparison if exactly 2 responses
+        if len(request.responses) == 2:
+            response_names = list(request.responses.keys())
+            response1 = request.responses[response_names[0]]
+            response2 = request.responses[response_names[1]]
             
-            # Calculate average scores by aspect
-            aspect_averages = {}
-            for aspect in ["precision", "coherence", "relevance", "efficiency", "creativity"]:
-                scores = [r["individual_scores"].get(aspect, 0) for r in successful_results if "individual_scores" in r]
-                if scores:
-                    aspect_averages[aspect] = sum(scores) / len(scores)
+            comparison_result = judge.compare_responses(
+                prompt=request.prompt,
+                response1=response1,
+                response2=response2
+            )
             
-            comparison_analysis = {
-                "best_response": best_response,
-                "best_score": results[best_response].get("final_score", 0),
-                "aspect_averages": aspect_averages,
-                "total_responses": len(request.responses),
-                "successful_evaluations": len(successful_results),
-                "failed_evaluations": len(request.responses) - len(successful_results)
+            return {
+                "prompt": request.prompt,
+                "comparison_type": "pairwise",
+                "winner": comparison_result["winner"],
+                "margin": comparison_result["margin"],
+                "response_evaluations": {
+                    response_names[0]: comparison_result["response1_evaluation"],
+                    response_names[1]: comparison_result["response2_evaluation"]
+                },
+                "comparison_summary": comparison_result["comparison_summary"],
+                "timestamp": datetime.now().isoformat()
             }
+        
+        # Handle multiple responses comparison
         else:
-            comparison_analysis = {
-                "error": "No successful evaluations to compare",
-                "total_responses": len(request.responses),
-                "successful_evaluations": 0,
-                "failed_evaluations": len(request.responses)
+            results = {}
+            scores = []
+            
+            # Evaluate each response
+            for name, response in request.responses.items():
+                try:
+                    result = judge.evaluate(
+                        prompt=request.prompt,
+                        response=response,
+                        weights=request.custom_weights
+                    )
+                    
+                    results[name] = {
+                        "overall_score": result["overall_score"],
+                        "detailed_scores": result["detailed_scores"],
+                        "detailed_feedback": result["detailed_feedback"],
+                        "evaluation_time": result["evaluation_time"]
+                    }
+                    
+                    scores.append((name, result["overall_score"]))
+                    
+                except Exception as e:
+                    logger.error(f"Comparison evaluation for '{name}' failed: {e}")
+                    results[name] = {
+                        "status": "failed",
+                        "error": str(e)
+                    }
+            
+            # Generate comparison analysis
+            successful_results = [(k, v) for k, v in results.items() if "overall_score" in v]
+            
+            if successful_results:
+                # Sort by score
+                scores.sort(key=lambda x: x[1], reverse=True)
+                
+                best_response = scores[0][0]
+                best_score = scores[0][1]
+                
+                # Calculate aspect averages
+                aspect_totals = {}
+                aspect_counts = {}
+                
+                for name, result in successful_results:
+                    if "detailed_scores" in result:
+                        for aspect, score in result["detailed_scores"].items():
+                            if aspect not in aspect_totals:
+                                aspect_totals[aspect] = 0
+                                aspect_counts[aspect] = 0
+                            aspect_totals[aspect] += score
+                            aspect_counts[aspect] += 1
+                
+                aspect_averages = {
+                    aspect: total / aspect_counts[aspect]
+                    for aspect, total in aspect_totals.items()
+                    if aspect_counts[aspect] > 0
+                }
+                
+                comparison_analysis = {
+                    "best_response": best_response,
+                    "best_score": best_score,
+                    "ranking": scores,
+                    "aspect_averages": aspect_averages,
+                    "total_responses": len(request.responses),
+                    "successful_evaluations": len(successful_results),
+                    "failed_evaluations": len(request.responses) - len(successful_results)
+                }
+            else:
+                comparison_analysis = {
+                    "error": "No successful evaluations to compare",
+                    "total_responses": len(request.responses),
+                    "successful_evaluations": 0,
+                    "failed_evaluations": len(request.responses)
+                }
+            
+            return {
+                "prompt": request.prompt,
+                "comparison_type": "multiple",
+                "results": results,
+                "comparison_analysis": comparison_analysis,
+                "timestamp": datetime.now().isoformat()
             }
-        
-        return {
-            "prompt": request.prompt,
-            "domain": request.domain,
-            "results": results,
-            "comparison_analysis": comparison_analysis,
-            "timestamp": datetime.now().isoformat()
-        }
         
     except Exception as e:
         logger.error(f"Response comparison failed: {e}")
@@ -440,52 +385,60 @@ async def clear_evaluation_cache():
     evaluation_cache.clear()
     return {"message": f"Cleared {cleared_count} cached evaluations"}
 
-@router.get("/judges/weights")
-async def get_current_weights():
-    """Get current judge weights"""
+@router.get("/model/default-weights")
+async def get_default_weights():
+    """Get default evaluation weights for Phi-2 model"""
     try:
-        from app.main import judges_panel
-        
-        if not judges_panel:
-            raise HTTPException(status_code=503, detail="Judges panel not ready")
+        default_weights = {
+            "relevance": 0.3,
+            "coherence": 0.25,
+            "accuracy": 0.25,
+            "completeness": 0.2
+        }
         
         return {
-            "weights": judges_panel.weights,
-            "total_weight": sum(judges_panel.weights.values()),
+            "default_weights": default_weights,
+            "total_weight": sum(default_weights.values()),
+            "supported_aspects": list(default_weights.keys()),
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"Failed to get weights: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to get weights: {str(e)}")
+        logger.error(f"Failed to get default weights: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get default weights: {str(e)}")
 
-@router.post("/judges/weights")
-async def update_weights(new_weights: Dict[str, float]):
-    """Update judge weights"""
+@router.post("/model/validate-weights")
+async def validate_weights(weights: Dict[str, float]):
+    """Validate custom weights for evaluation"""
     try:
-        from app.main import judges_panel
+        # Check that all weights are valid numbers between 0 and 1
+        if not all(0 <= weight <= 1 for weight in weights.values()):
+            return {
+                "valid": False,
+                "error": "All weights must be between 0 and 1",
+                "timestamp": datetime.now().isoformat()
+            }
         
-        if not judges_panel:
-            raise HTTPException(status_code=503, detail="Judges panel not ready")
+        # Check that weights sum to a reasonable total (allow some flexibility)
+        total_weight = sum(weights.values())
+        if total_weight == 0:
+            return {
+                "valid": False,
+                "error": "Weights cannot all be zero",
+                "timestamp": datetime.now().isoformat()
+            }
         
-        # Validate weights
-        if not all(0 <= weight <= 1 for weight in new_weights.values()):
-            raise HTTPException(status_code=400, detail="All weights must be between 0 and 1")
-        
-        # Update weights
-        judges_panel.weights.update(new_weights)
-        
-        # Normalize weights to sum to 1.0
-        total_weight = sum(judges_panel.weights.values())
-        if total_weight > 0:
-            judges_panel.weights = {k: v/total_weight for k, v in judges_panel.weights.items()}
+        # Normalize weights
+        normalized_weights = {k: v/total_weight for k, v in weights.items()}
         
         return {
-            "message": "Weights updated successfully",
-            "weights": judges_panel.weights,
+            "valid": True,
+            "original_weights": weights,
+            "normalized_weights": normalized_weights,
+            "total_weight": total_weight,
             "timestamp": datetime.now().isoformat()
         }
         
     except Exception as e:
-        logger.error(f"Failed to update weights: {e}")
-        raise HTTPException(status_code=500, detail=f"Failed to update weights: {str(e)}")
+        logger.error(f"Failed to validate weights: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to validate weights: {str(e)}")
